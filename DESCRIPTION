@@ -1,0 +1,10 @@
+Package: ElasticSynth
+Title: What the Package Does (one line, title case)
+Version: 0.0.0.9000
+Authors@R: person("Terrence", "Neumann", email = "tdneumann@uchicago.edu", role = c("aut", "cre"))
+Description: A synthetic controls method for comparitive case studies that utilizes elastic net regression (glmnet) to assign unit weights. Includes cross validation selection mechanism for optimal alpha (L1 and L2 regularization) and lambda (weight penalty).
+Depends: R (>= 3.3.2)
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 6.0.1
