@@ -191,7 +191,7 @@ ElasticSynth <- function(PredictorMatrix,
         rmse        <- sqrt(sum(abs(gaps[pre]))/length(pre))
         
         
-        plotFrame   <- data.frame(time = 1:max(post), Y_true = Y_true, Y_elast = Y_elast, gaps = gaps)
+        plotFrame   <- data.frame(time = c(pre,post), Y_true = Y_true, Y_elast = Y_elast, gaps = gaps)
         plotFrame   <- merge(plotFrame, month_join, by = 'time', all.x = TRUE)
         min_post_month <- plotFrame$month[plotFrame$time == min(post)]
         max_post_month <- plotFrame$month[plotFrame$time == max(post)]
@@ -220,7 +220,7 @@ ElasticSynth <- function(PredictorMatrix,
       Y_true      <- Y1
       gaps        <- Y_true[c(pre,post)] - Y_elast[c(pre,post)]
       rmse        <- sqrt(sum(abs(gaps[pre]))/length(pre))
-      new_frame   <- data.frame(gaps = unlist(gaps), time = 1:max(post), unit_type = ifelse(i == 1, 'Treated Unit', 'Control Unit Distribution'), unit = colnames(Y)[i])
+      new_frame   <- data.frame(gaps = unlist(gaps), time = c(pre,post), unit_type = ifelse(i == 1, 'Treated Unit', 'Control Unit Distribution'), unit = colnames(Y)[i])
       new_frame   <- rbind(old_frame, new_frame)
       
     }
