@@ -25,7 +25,6 @@ ElasticSynth <- function(PredictorMatrix,
                          post,   
                          lambda_grid = c(seq(from = 1e-03, to = 1e-01, by = 1e-02),seq(from = 2e-01, to = 100, by = 1e-01), seq(from = 200, to = 50000, by = 100)),
                          a_grid =seq(from = 0.1, to = 0.9, by = 0.01),
-                         inference = FALSE,
                          start_month,
                          end_month,
                          time_unit,
@@ -41,23 +40,38 @@ ElasticSynth <- function(PredictorMatrix,
   suppressMessages(library(ggplot2))
   suppressMessages(library(lubridate))
   
+  #### functions
+  penaltyCleanup <- function(penalty, treated, i) {
+    if (i <= treated & i > 1) {
+      penaltyTreated = penalty[treated - 1]
+      penaltyMinusTreated = penalty[-(treated - 1)]
+      penalty = c(penaltyTreated, penaltyMinusTreated)
+    }
+    else if (i > treated & i > 1) {
+      penaltyTreated = penalty[treated]
+      penaltyMinusTreated = penalty[-(treated)]
+      penalty = c(penaltyTreated, penaltyMinusTreated)
+    }
+    return(penalty)
+  }
+  
   #### necessary data structure
   # Predictors for units minus treated
   X0 <- as.matrix(PredictorMatrix[,-treated])
   # Predictors for treated
-  X1 <- as.matrix(PredictorMatrix[,treated])
+  X1 <- as.matrix(PredictorMatrix[,treated, drop = F])
   # Combined
   X  <- as.matrix(cbind(X1, X0))
   # Time Periods for units minus treated
   Y0 <- as.matrix(OutcomeMatrix[,-treated])
   # Time Periods for treated
-  Y1 <- as.matrix(OutcomeMatrix[,treated])
+  Y1 <- as.matrix(OutcomeMatrix[,treated, drop = F])
   # Combined
   Y  <- as.matrix(cbind(Y1, Y0))
   # Pre period units minus treated
   Z0 <- as.matrix(Y0[pre,])
   # Pre period for treated
-  Z1 <- as.matrix(Y1[pre,1])
+  Z1 <- as.matrix(Y1[pre,1, drop = F])
   # Combined
   Z  <- as.matrix(cbind(Z1, Z0))
   
@@ -97,22 +111,22 @@ ElasticSynth <- function(PredictorMatrix,
     a         <- a_grid[j]
     cat('a =', toString(a), '\n')
     err       <- matrix(0, nrow = N - 1, ncol = nlambda)
-    for (i in 2:N) {
-      Y1      <- as.matrix(Y[,i])
+    for (i in 1:N) {
+      Y1      <- as.matrix(Y[,i, drop = F])
       Y0      <- as.matrix(Y[,-c(1,i)])
-      Z1      <- as.matrix(Z[,i])
+      Z1      <- as.matrix(Z[,i, drop = F])
       Z0      <- as.matrix(Z[,-c(1,i)])
-      X1      <- as.matrix(X[,i])
+      X1      <- as.matrix(X[,i, drop = F])
       X0      <- as.matrix(X[,-c(1,i)])
       Z1_tr   <- Z1
       Z0_tr   <- Z0
       Z1_te   <- as.matrix(Y1[-(1:T0),])
       Z0_te   <- as.matrix(Y0[-(1:T0),])
-      penalty = penaltyMat[,i]
-      
+
       # CV - Find optimal lambda and alpha across all units
       V1      <- rbind(scale(Z1_tr, scale = FALSE), scale(X1, scale = FALSE))
       V0      <- rbind(scale(Z0_tr, scale = FALSE), scale(X0, scale = FALSE))
+      penalty <- penaltyCleanup(penaltyMat[,i, drop = F], treated, i)
       fit     <- glmnet(x = V0, y = V1,
                         alpha = a,
                         lambda = lambda_grid,
@@ -144,20 +158,20 @@ ElasticSynth <- function(PredictorMatrix,
   Y_elast     <- matrix(0, nrow = Time, ncol = 1)
   Y_true      <- matrix(0, nrow = Time, ncol = 1)
   old_frame   <- data.frame()
-  penaltyMat  <- cbind(penaltyMat[,treated], penaltyMat[,-treated])
     for (i in 1:N) {
       if (i != 1) {
         old_frame <- new_frame
       }
-      Y1 <- as.matrix(Y[,i])
+      Y1 <- as.matrix(Y[,i,drop = F])
       Y0 <- as.matrix(Y[,-i])
-      Z1 <- as.matrix(Z[,i])
+      Z1 <- as.matrix(Z[,i, drop = F])
       Z0 <- as.matrix(Z[,-i])
-      X1 <- as.matrix(X[,i])
+      X1 <- as.matrix(X[,i, drop = F])
       X0 <- as.matrix(X[,-i])
       V1 <- rbind(scale(Z1, scale = FALSE), scale(X1, scale = FALSE))
       V0 <- rbind(scale(Z0, scale = FALSE), scale(X0, scale = FALSE))
-      penalty = penaltyMat[,i]
+      penalty = penaltyCleanup(penaltyMat[,i, drop = F], treated, i)
+      
       # Fit elast
       fit_final   <- glmnet(x = V0, y = V1,
                             alpha = a_opt,
@@ -167,15 +181,13 @@ ElasticSynth <- function(PredictorMatrix,
                             pmax = max_number_units,
                             lower.limits = lower_limit_weights,
                             penalty.factor = penalty)
-      w           <- as.matrix(coef(fit_final, s = lambda_opt))
+      w           <- as.matrix(coef(fit_final, s = lambda_opt))[-1,]
       if (i == 1) {
-        w_final     <- w[-1,]
-        w           <- w[-1,]
+        w_final     <- w
         int_elast   <- as.matrix(apply(Z1 - Z0 %*% w_final, 2, mean))
-        w_elast     <- w
         Y_elast     <- int_elast[rep(1, Time),] + Y0 %*% w_final
-        Y_true      <- Y1
-        gaps        <- Y_true - Y_elast
+        Y_true      <- Y1[c(pre,post)]
+        gaps        <- Y_true[c(pre,post)] - Y_elast[c(pre,post)]
         rmse        <- sqrt(sum(abs(gaps[pre]))/length(pre))
         
         
@@ -197,21 +209,18 @@ ElasticSynth <- function(PredictorMatrix,
                 axis.line.y = element_line(colour = 'black')) +
           xlab('Time Period') +
           ylab('Outcome') +  
-          xlim(c(as.Date(start_month), as.Date(end_month %m+% 2)))
+          xlim(c(as.Date(start_month), as.Date(end_month %m+% months(2))))
         
         
         
       }
-      else {
-        w             <- w[-1,]
-      }
+      
       int_elast   <- as.matrix(apply(Z1 - Z0 %*% w, 2, mean))
-      w_elast     <- w
       Y_elast     <- int_elast[rep(1, Time),] + Y0 %*% w
       Y_true      <- Y1
-      gaps        <- Y_true - Y_elast
+      gaps        <- Y_true[c(pre,post)] - Y_elast[c(pre,post)]
       rmse        <- sqrt(sum(abs(gaps[pre]))/length(pre))
-      new_frame   <- data.frame(gaps = gaps, time = 1:max(post), unit_type = ifelse(i == 1, 'Treated Unit', 'Control Unit Distribution'), unit = colnames(Y)[i])
+      new_frame   <- data.frame(gaps = unlist(gaps), time = 1:max(post), unit_type = ifelse(i == 1, 'Treated Unit', 'Control Unit Distribution'), unit = colnames(Y)[i])
       new_frame   <- rbind(old_frame, new_frame)
       
     }
@@ -282,7 +291,9 @@ ElasticSynthRun <- function(PredictorMatrix,
                             PrePeriodList,
                             PostPeriodList,
                             max_number_units,
-                            PenaltyTermsMat,
+                            PenaltyTermsMat = matrix(rep(1, ncol(OutcomeMatrix)*(ncol(OutcomeMatrix) - 1)), 
+                                                     ncol = ncol(OutcomeMatrix), 
+                                                     nrow = ncol(OutcomeMatrix)),
                             time_unit,
                             start_month,
                             end_month,
@@ -310,7 +321,6 @@ ElasticSynthRun <- function(PredictorMatrix,
                                      post = unlist(PostPeriodList[[i]]),
                                      max_number_units = max_number_units,
                                      time_unit = time_unit,
-                                     inference = T,
                                      lambda_grid = c(seq(from = 1e-03, to = 1e-01, by = 1e-02),seq(from = 2e-01, to = 100, by = 1e-01), seq(from = 200, to = 50000, by = 100)),
                                      a_grid =seq(from = 0.1, to = 0.9, by = 0.01),
                                      start_month = start_month,
