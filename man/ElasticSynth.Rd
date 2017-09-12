@@ -7,11 +7,10 @@
 ElasticSynth(PredictorMatrix, OutcomeMatrix, treated, pre, post,
   lambda_grid = c(seq(from = 0.001, to = 0.1, by = 0.01), seq(from = 0.2, to =
   100, by = 0.1), seq(from = 200, to = 50000, by = 100)), a_grid = seq(from =
-  0.1, to = 0.9, by = 0.01), inference = FALSE, start_month, end_month,
-  time_unit, penaltyMat = matrix(rep(1, ncol(OutcomeMatrix) *
-  (ncol(OutcomeMatrix) - 1)), ncol = ncol(OutcomeMatrix), nrow =
-  ncol(OutcomeMatrix)), max_number_units = ncol(OutcomeMatrix),
-  lower_limit_weights = 0)
+  0.1, to = 0.9, by = 0.01), start_month, end_month, time_unit,
+  penaltyMat = matrix(rep(1, ncol(OutcomeMatrix) * (ncol(OutcomeMatrix) - 1)),
+  ncol = ncol(OutcomeMatrix), nrow = ncol(OutcomeMatrix)),
+  max_number_units = ncol(OutcomeMatrix), lower_limit_weights = 0)
 }
 \arguments{
 \item{PredictorMatrix}{a p x n matrix where each row is a seperate control variable to be included in the analysis for each unit}

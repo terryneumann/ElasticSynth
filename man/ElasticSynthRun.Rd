@@ -5,8 +5,10 @@
 \title{ElasticSynthRun}
 \usage{
 ElasticSynthRun(PredictorMatrix, OutcomeMatrix, TreatedUnitList, PrePeriodList,
-  PostPeriodList, max_number_units, PenaltyTermsMat, time_unit, start_month,
-  end_month, lower_limit_weights, storage_folder)
+  PostPeriodList, max_number_units, PenaltyTermsMat = matrix(rep(1,
+  ncol(OutcomeMatrix) * (ncol(OutcomeMatrix) - 1)), ncol = ncol(OutcomeMatrix),
+  nrow = ncol(OutcomeMatrix)), time_unit, start_month, end_month,
+  lower_limit_weights, storage_folder)
 }
 \arguments{
 \item{PredictorMatrix}{a p x n matrix where each row is a seperate control variable to be included in the analysis for each unit}
