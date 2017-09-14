@@ -14,6 +14,7 @@
 #' @param time_unit The gap between observations in the case study. No default. A character string, containing one of "day", "week", "month", "quarter" or "year". This can optionally be preceded by an integer and a space, or followed by "s". Ex '3 months' or 'quarter'
 #' @param storage_folder The directory where graph outputs should be stored
 #' @return Doesn't return an object, but will output path plot and gap plot to a directory
+#' @export
 
 
 ElasticSynthCovariates <- function(treatedUnits,
