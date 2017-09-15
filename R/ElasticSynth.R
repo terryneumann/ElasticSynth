@@ -31,7 +31,7 @@ ElasticSynth <- function(PredictorMatrix,
                          time_unit,
                          penaltyMat =  matrix(rep(1, ncol(OutcomeMatrix)*(ncol(OutcomeMatrix) - 1)), 
                                               ncol = ncol(OutcomeMatrix), 
-                                              nrow = ncol(OutcomeMatrix)),
+                                              nrow = ncol(OutcomeMatrix) - 1),
                          max_number_units = ncol(OutcomeMatrix),
                          lower_limit_weights = 0) 
 {
