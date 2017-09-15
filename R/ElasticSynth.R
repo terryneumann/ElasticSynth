@@ -111,7 +111,7 @@ ElasticSynth <- function(PredictorMatrix,
   for (j in 1:na) {
     a         <- a_grid[j]
     cat('a =', toString(a), '\n')
-    err       <- matrix(0, nrow = N - 1, ncol = nlambda)
+    err       <- matrix(0, nrow = N, ncol = nlambda)
     for (i in 1:N) {
       Y1      <- as.matrix(Y[,i, drop = F])
       Y0      <- as.matrix(Y[,-c(i)])
@@ -121,8 +121,8 @@ ElasticSynth <- function(PredictorMatrix,
       X0      <- as.matrix(X[,-c(i)])
       Z1_tr   <- Z1
       Z0_tr   <- Z0
-      Z1_te   <- as.matrix(Y1[-(1:T0),])
-      Z0_te   <- as.matrix(Y0[-(1:T0),])
+      Z1_te   <- as.matrix(Y1[-(1:(T0-5)),])
+      Z0_te   <- as.matrix(Y0[-(1:(T0-5)),])
 
       # CV - Find optimal lambda and alpha across all units
       V1      <- rbind(scale(Z1_tr, scale = FALSE), scale(X1, scale = FALSE))
@@ -136,11 +136,10 @@ ElasticSynth <- function(PredictorMatrix,
                         lower.limits = lower_limit_weights,
                         pmax = max_number_units,
                         penalty.factor = penalty)
-      w       <- as.matrix(coef(fit, s = lambda_grid))
-      w       <- w[-1,]
+      w       <- as.matrix(coef(fit, s = lambda_grid))[-1,]
       int     <- t(as.matrix(apply(Z1_tr[,rep(1, nlambda)] - Z0_tr %*% w, 2, mean)))
-      e       <- Z1_te[,rep(1, nlambda)] - int[rep(1, T1),] - Z0_te %*% w
-      err[i - 1,] <- colMeans(e^2, na.rm = TRUE)
+      e       <- Z1_te[,rep(1, nlambda)] - int[rep(1, T1 + 5),] - Z0_te %*% w
+      err[i,] <- colMeans(e^2, na.rm = TRUE)
     }
     # Optimal lambda
     err       <- apply(err, 2, mean)
