@@ -112,7 +112,7 @@ ElasticSynth <- function(PredictorMatrix,
     a         <- a_grid[j]
     cat('a =', toString(a), '\n')
     err       <- matrix(0, nrow = N - 1, ncol = nlambda)
-    for (i in 1:N) {
+    for (i in 2:N) {
       Y1      <- as.matrix(Y[,i, drop = F])
       Y0      <- as.matrix(Y[,-c(1,i)])
       Z1      <- as.matrix(Z[,i, drop = F])
