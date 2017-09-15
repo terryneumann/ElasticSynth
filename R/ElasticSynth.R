@@ -188,6 +188,7 @@ ElasticSynth <- function(PredictorMatrix,
         Y_elast     <- int_elast[rep(1, Time),] + Y0 %*% w_final
         Y_elast_final <- Y_elast
         Y_true      <- Y1[c(pre,post)]
+        Y_true_final <- Y_true
         gaps        <- Y_true[c(pre,post)] - Y_elast[c(pre,post)]
         rmse        <- sqrt(sum(abs(gaps[pre]))/length(pre))
         
@@ -254,7 +255,7 @@ ElasticSynth <- function(PredictorMatrix,
     
     
     return(list(w = w_final, 
-                Y_true = Y_true, 
+                Y_true = Y_true_final, 
                 Y_elast = Y_elast_final, 
                 fit = fit_final, 
                 lambda_opt = lambda_opt, 
