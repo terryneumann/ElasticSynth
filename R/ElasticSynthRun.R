@@ -32,7 +32,8 @@ ElasticSynthRun <- function(PredictorMatrix,
                             start_month,
                             end_month,
                             lower_limit_weights,
-                            storage_folder) 
+                            storage_folder,
+                            cv) 
 
 {
   
@@ -60,7 +61,8 @@ ElasticSynthRun <- function(PredictorMatrix,
                                      start_month = start_month,
                                      end_month = end_month,
                                      lower_limit_weights = lower_limit_weights,
-                                     penaltyMat = PenaltyTermsMat
+                                     penaltyMat = PenaltyTermsMat,
+                                     cv = cv
     )
     
     
