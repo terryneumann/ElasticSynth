@@ -20,7 +20,7 @@
 #' @return Doesn't return an object, but will save placebo test results and true vs. fitted graphs for each treated unit into storage_folder param
 #' @export
 
-ElasticSynthRun <- function(PredictorMatrix,
+ElasticSynthRun =function(PredictorMatrix,
                             OutcomeMatrix,
                             TreatedUnitList,
                             PrePeriodList,
@@ -41,17 +41,17 @@ ElasticSynthRun <- function(PredictorMatrix,
   suppressMessages(library(ggplot2))
   
   
-  n          <- length(TreatedUnitList)
-  weights    <- rep(list(list()), n)
-  dev.ratio  <- c()
-  
+  n          = length(TreatedUnitList)
+  weights    = rep(list(list()), n)
+  dev.ratio  = c()
+  PostDeviation = c()
   for (i in 1:n) {
     cat(paste('
               ##########\n
               ##########\n
               ##########\n
               Treated Unit', TreatedUnitList[i]))
-    elasticSynth.out <- ElasticSynth(PredictorMatrix = PredictorMatrix,
+    elasticSynth.out =ElasticSynth(PredictorMatrix = PredictorMatrix,
                                      OutcomeMatrix = OutcomeMatrix,
                                      treated = TreatedUnitList[i],
                                      pre = unlist(PrePeriodList[[i]]),
@@ -70,16 +70,19 @@ ElasticSynthRun <- function(PredictorMatrix,
     )
     
     
-    placebo <- elasticSynth.out$placebo
-    path.plot <- elasticSynth.out$path.plot 
+    placebo =elasticSynth.out$placebo
+    path.plot =elasticSynth.out$path.plot 
     
     
     ggsave(path.plot, filename = paste(storage_folder, '/path', TreatedUnitList[i], '.png', sep = ''), width = 10, height = 5)
     ggsave(placebo, filename = paste(storage_folder, '/placebo', TreatedUnitList[i], '.png', sep = ''), width = 10, height = 5)
     
     
-    weights[[i]] <- elasticSynth.out$w
-    dev.ratio[i] <- elasticSynth.out$dev.ratio
+    weights[[i]] = elasticSynth.out$w
+    dev.ratio[i] = elasticSynth.out$dev.ratio
+    true = elasticSynth.out$Y_true[unlist(PostPeriodList[[i]])]
+    synth = elasticSynth.out$Y_elast[unlist(PostPeriodList[[i]])]
+    PostDeviation[i] = (sum(true) - sum(synth))/sum(synth)
     
     
   }
@@ -87,5 +90,6 @@ ElasticSynthRun <- function(PredictorMatrix,
   
   save(weights, file = paste(storage_folder, '/SynthWeights.Rdata', sep = ''))
   save(dev.ratio, file = paste(storage_folder, '/SynthDevRatio.Rdata', sep = ''))
+  save(PostDeviation, file = paste(storage_folder, '/PostDeviation.Rdata', sep = ''))
   
 }
