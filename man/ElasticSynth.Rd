@@ -36,9 +36,11 @@ ElasticSynth(PredictorMatrix, OutcomeMatrix, treated, pre, post,
 \item{max_number_units}{glmnet param - The maximum number of units glmnet will select. Useful for forcing parsimonious models. Default allows all units to receive weight.}
 
 \item{lower_limit_weights}{The lower limit value of weight that can be placed on any unit. Default is zero (non-negative constraint). Change if desired, but be wary of overfitting.}
+
+\item{cv}{The number of periods of pre-data to include in cross validation step. Helpful to include more if you don't have much post-period data}
 }
 \value{
-list containing output weights for treated unit (w_final), the actual outcome values (Y_true), the fitted outcome values (Y_elast), optimal value of lambda (lambda_opt), optimal value of alpha, (alpha_opt), a dataframe of the results of placebo test (placebo_frame), a plot of the path of the treated vs. actual unit (path.plot), and a plot of the placebo test results for the treated unit.
+list containing output weights for treated unit (w_final), the actual outcome values (Y_true), the fitted outcome values (Y_elast), optimal value of lambda (lambda_opt), optimal value of alpha, (alpha_opt), a dataframe of the results of placebo test (placebo_frame), a plot of the path of the treated vs. actual unit (path.plot), the deviation ratio of the fitted series (dev.ratio), and a plot of the placebo test results for the treated unit.
 }
 \description{
 A synthetic controls method for comparitive case studies
