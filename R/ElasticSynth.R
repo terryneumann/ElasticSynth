@@ -25,7 +25,9 @@ ElasticSynth = function(PredictorMatrix,
                          treated, 
                          pre, 
                          post,   
-                         lambda_grid = c(seq(from = 1e-04, to = 1e-01, by = 1e-04),seq(from = 2e-01, to = 100, by = 1e-01), seq(from = 200, to = 50000, by = 100)),
+                         lambda_grid = c(seq(from = 1e-04, to = 1e-01, by = 1e-04),
+                                         seq(from = 2e-01, to = 100, by = 1e-01), 
+                                         seq(from = 200, to = 50000, by = 100)),
                          a_grid =seq(from = 0.1, to = 0.9, by = 0.01),
                          start_month,
                          end_month,
@@ -185,7 +187,8 @@ ElasticSynth = function(PredictorMatrix,
                             penalty.factor = penalty)
       w           = as.matrix(coef(fit_final, s = lambda_opt))[-1,]
       if (i == 1) {
-        dev.ratio   = fit_final$dev.ratio
+        fit_treated = fit_final
+        dev.ratio   = max(fit_final$dev.ratio)
         w_final     = w
         int_elast   = as.matrix(apply(Z1 - Z0 %*% w_final, 2, mean))
         Y_elast     = int_elast[rep(1, Time),] + Y0 %*% w_final

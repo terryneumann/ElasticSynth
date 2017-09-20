@@ -16,6 +16,7 @@
 #' @param end_month the end month of the case study (last post-period). This is used for plotting
 #' @param time_unit The gap between observations in the case study. No default. A character string, containing one of "day", "week", "month", "quarter" or "year". This can optionally be preceded by an integer and a space, or followed by "s". Ex '3 months' or 'quarter'
 #' @param storage_folder The directory where graph and weight outputs should be stored
+#' @param cv The number of periods of pre-data to include in cross validation step. Helpful to include more if you don't have much post-period data
 #' @return Doesn't return an object, but will save placebo test results and true vs. fitted graphs for each treated unit into storage_folder param
 #' @export
 
@@ -42,6 +43,7 @@ ElasticSynthRun <- function(PredictorMatrix,
   
   n          <- length(TreatedUnitList)
   weights    <- rep(list(list()), n)
+  dev.ratio  <- c()
   
   for (i in 1:n) {
     cat(paste('
@@ -56,7 +58,9 @@ ElasticSynthRun <- function(PredictorMatrix,
                                      post = unlist(PostPeriodList[[i]]),
                                      max_number_units = max_number_units,
                                      time_unit = time_unit,
-                                     lambda_grid = c(seq(from = 1e-03, to = 1e-01, by = 1e-02),seq(from = 2e-01, to = 100, by = 1e-01), seq(from = 200, to = 50000, by = 100)),
+                                     lambda_grid = c(seq(from = 1e-04, to = 1e-01, by = 1e-04),
+                                                     seq(from = 2e-01, to = 100, by = 1e-01), 
+                                                     seq(from = 200, to = 50000, by = 100)),
                                      a_grid =seq(from = 0.1, to = 0.9, by = 0.01),
                                      start_month = start_month,
                                      end_month = end_month,
@@ -75,11 +79,13 @@ ElasticSynthRun <- function(PredictorMatrix,
     
     
     weights[[i]] <- elasticSynth.out$w
+    dev.ratio[i] <- elasticSynth.out$dev.ratio
     
     
   }
   
   
   save(weights, file = paste(storage_folder, '/SynthWeights.Rdata', sep = ''))
+  save(dev.ratio, file = paste(storage_folder, '/SynthDevRatio.Rdata', sep = ''))
   
 }
