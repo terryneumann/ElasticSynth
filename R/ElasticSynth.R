@@ -185,7 +185,7 @@ ElasticSynth = function(PredictorMatrix,
                             penalty.factor = penalty)
       w           = as.matrix(coef(fit_final, s = lambda_opt))[-1,]
       if (i == 1) {
-        dev.ratio   = fit_final$dev.ratio
+        dev.ratio   = fit_final$dev.ratio[ind_opt]
         w_final     = w
         int_elast   = as.matrix(apply(Z1 - Z0 %*% w_final, 2, mean))
         Y_elast     = int_elast[rep(1, Time),] + Y0 %*% w_final
