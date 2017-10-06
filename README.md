@@ -20,6 +20,14 @@ This method, published by Doudchenko and Imbens in 2016, is an implementation of
 
 by using <b>glmnet</b> as the underlying optimization.
 
+Install with the following command
+```r
+
+devtools::install_github('tdn158/ElasticSynth')
+
+
+```
+
 
 
 
