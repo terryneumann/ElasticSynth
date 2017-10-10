@@ -4,17 +4,12 @@
 \alias{ElasticSynth}
 \title{ElasticSynth}
 \usage{
-ElasticSynth(PredictorMatrix, OutcomeMatrix, treated, pre, post,
-  lambda_grid = c(seq(from = 0.001, to = 0.1, by = 0.01), seq(from = 0.2, to =
-  100, by = 0.1), seq(from = 200, to = 50000, by = 100)), a_grid = seq(from =
-  0.1, to = 0.9, by = 0.01), start_month, end_month, time_unit,
-  penaltyMat = matrix(rep(1, ncol(OutcomeMatrix) * (ncol(OutcomeMatrix) - 1)),
-  ncol = ncol(OutcomeMatrix), nrow = ncol(OutcomeMatrix) - 1),
-  max_number_units = ncol(OutcomeMatrix), lower_limit_weights = 0, cv = 0)
+ElasticSynth(OutcomeMatrix, treated, pre, post, a_grid = seq(from = 0.1, to =
+  0.9, by = 0.1), start_month, end_month, time_unit,
+  max_number_units = ncol(OutcomeMatrix), lower_limit_weights = 0,
+  upper_limit_weights = 1, nfolds = 5)
 }
 \arguments{
-\item{PredictorMatrix}{a p x n matrix where each row is a seperate control variable to be included in the analysis for each unit}
-
 \item{OutcomeMatrix}{a t x n matrix where each row is the outcome variable of interest at time t for each unit}
 
 \item{treated}{the column index for the treated unit in both PredictorMatrix and OutcomeMatrix. For multiple treated units, see 'ElasticSynthRun'}
@@ -23,7 +18,7 @@ ElasticSynth(PredictorMatrix, OutcomeMatrix, treated, pre, post,
 
 \item{post}{a vector of row indices indicating the post period (Ex. 41:50)}
 
-\item{lambda_grid}{glmnet param - a vector of values for lambda to fitted at each alpha value during cross validation. For more information, see glmnet}
+\item{a_grid}{glmnet param - a vector of values for alpha to be fitted in cross validation}
 
 \item{start_month}{the start month of the case study (first pre-period). This is used for plotting}
 
@@ -31,13 +26,15 @@ ElasticSynth(PredictorMatrix, OutcomeMatrix, treated, pre, post,
 
 \item{time_unit}{The gap between observations in the case study. No default. A character string, containing one of "day", "week", "month", "quarter" or "year". This can optionally be preceded by an integer and a space, or followed by "s". Ex '3 months' or 'quarter'}
 
-\item{penaltyMat}{glmnet param - (optional) a n-1 x n matrix of additional penalties placed upon glmnet for selecting certain units. Useful in the case of multiple treated units. Each column of the matrix represents the penalties to be placed on the control units. The treated unit is excluded from the column. See glmnet param penalty.factor for more details. Default is no additional penalties on any unit.}
-
 \item{max_number_units}{glmnet param - The maximum number of units glmnet will select. Useful for forcing parsimonious models. Default allows all units to receive weight.}
 
 \item{lower_limit_weights}{The lower limit value of weight that can be placed on any unit. Default is zero (non-negative constraint). Change if desired, but be wary of overfitting.}
 
-\item{cv}{The number of periods of pre-data to include in cross validation step. Helpful to include more if you don't have much post-period data}
+\item{upper_limit_weights}{The upper limit value of weight that can be placed on any unit. Default is one.}
+
+\item{nfolds}{The number of folds used in cross validation. The default is 5.}
+
+\item{penaltyMat}{glmnet param - (optional) a n-1 x n matrix of additional penalties placed upon glmnet for selecting certain units. Useful in the case of multiple treated units. Each column of the matrix represents the penalties to be placed on the control units. The treated unit is excluded from the column. See glmnet param penalty.factor for more details. Default is no additional penalties on any unit.}
 }
 \value{
 list containing output weights for treated unit (w_final), the actual outcome values (Y_true), the fitted outcome values (Y_elast), optimal value of lambda (lambda_opt), optimal value of alpha, (alpha_opt), a dataframe of the results of placebo test (placebo_frame), a plot of the path of the treated vs. actual unit (path.plot), the deviation ratio of the fitted series (dev.ratio), and a plot of the placebo test results for the treated unit.

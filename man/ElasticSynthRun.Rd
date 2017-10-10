@@ -34,6 +34,8 @@ ElasticSynthRun(PredictorMatrix, OutcomeMatrix, TreatedUnitList, PrePeriodList,
 \item{lower_limit_weights}{glmnet param - The lower limit value of weight that can be placed on any unit. Default is zero (non-negative constraint). Change if desired, but be wary of overfitting.}
 
 \item{storage_folder}{The directory where graph and weight outputs should be stored}
+
+\item{cv}{The number of periods of pre-data to include in cross validation step. Helpful to include more if you don't have much post-period data}
 }
 \value{
 Doesn't return an object, but will save placebo test results and true vs. fitted graphs for each treated unit into storage_folder param
