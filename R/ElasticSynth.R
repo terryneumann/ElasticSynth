@@ -40,9 +40,10 @@ ElasticSynth = function(
   suppressMessages(library(ggplot2))
   suppressMessages(library(lubridate))
   
-  #### functions
   set.seed(12345)
-  #### necessary data structure
+  
+  ####  data structure
+  
   # Time Periods for units minus treated
   Y0 = as.matrix(OutcomeMatrix[,-treated])
   # Time Periods for treated
@@ -58,16 +59,14 @@ ElasticSynth = function(
   
   ##### Params
   
-  # Number of Predictors
-  K  = dim(X)[1]
   # Number of units
   N  = dim(Y)[2]
   # Total time periods
-  Time = dim(Y)[1]
+  Time = length(c(pre,post))
   # Pre period
-  T0   = dim(Z)[1]
+  T0   = length(pre)
   # Post Period
-  T1   = Time - T0
+  T1   = length(post)
   
   
   ## Month frame for plotting
@@ -76,9 +75,8 @@ ElasticSynth = function(
   month_seq  = seq(start_month, end_month, by = time_unit)
   month_join = data.frame(time = 1:max(post), month = month_seq)
   
-  ## Find the optimal elast
-  # Iterate over i
-  nlambda             = length(lambda_grid)
+  ###### Cross validation for many lambda over given alpha
+  
   na                  = length(a_grid)
   err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, unit = colnames(Y))
   
@@ -94,7 +92,6 @@ ElasticSynth = function(
       Y0       = as.matrix(Y[,-c(1, i, grep(paste(unitName, '_', sep = ''), colnames(Y)))])
       Z1       = as.matrix(Z[,i, drop = F])
       Z0       = as.matrix(Z[,-c(1, i, grep(paste(unitName, '_', sep = ''), colnames(Z)))])
-      
       V1      = scale(Z1, scale = FALSE)
       V0      = scale(Z0, scale = FALSE)
       fit     = cv.glmnet(x = V0, y = V1,
