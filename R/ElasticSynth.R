@@ -17,6 +17,7 @@
 #' @param lower_limit_weights The lower limit value of weight that can be placed on any unit. Default is zero (non-negative constraint). Change if desired, but be wary of overfitting.
 #' @param upper_limit_weights The upper limit value of weight that can be placed on any unit. Default is one.
 #' @param nfolds The number of folds used in cross validation. The default is 5.
+#' @param test Hypothesis test - 'lower', 'upper', or 'two-sided'
 #' @return list containing output weights for treated unit (w_final), the actual outcome values (Y_true), the fitted outcome values (Y_elast), optimal value of lambda (lambda_opt), optimal value of alpha, (alpha_opt), a dataframe of the results of placebo test (placebo_frame), a plot of the path of the treated vs. actual unit (path.plot), the deviation ratio of the fitted series (dev.ratio), and a plot of the placebo test results for the treated unit. 
 #' @export
 
@@ -32,7 +33,9 @@ ElasticSynth = function(
   max_number_units = ncol(OutcomeMatrix),
   lower_limit_weights = 0,
   upper_limit_weights = 1,
-  nfolds = 5) 
+  nfolds = 5,
+  test,
+  err_alpha_lambda_opt = NULL) 
 {
   
   
@@ -74,24 +77,54 @@ ElasticSynth = function(
   end_month = as.Date(end_month)
   month_seq  = seq(start_month, end_month, by = time_unit)
   month_join = data.frame(time = 1:max(post), month = month_seq)
-  
-  ###### Cross validation for many lambda over given alpha
-  
-  na                  = length(a_grid)
-  err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, unit = colnames(Y))
-  
+ 
   
   cat('\n\n\n\n******* Cross Validation *******n\n\n\n')
-  for (i in 1:N) {
-    cat('*** Unit', colnames(Y[,i,drop = F]), '***\n\n')
-    err       = matrix(0, nrow = 1, ncol = nlambda)
+  
+  if (is.null(err_alpha_lambda_opt)) {
+    na                  = length(a_grid)
+    err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, unit = colnames(Y))
+    
+    
+    for (i in 1:N) {
+      cat('*** Unit', colnames(Y[,i,drop = F]), '***\n\n')
+      for (j in 1:na) {
+        a       = a_grid[j]
+        Y1       = as.matrix(Y[,i, drop = F])
+        unitName = gsub('_[0-9]+', '', colnames(Y1))
+        Y0       = as.matrix(Y[,-c(1, i, grep(paste(unitName, '_', sep = ''), colnames(Y)))])
+        Z1       = as.matrix(Z[,i, drop = F])
+        Z0       = as.matrix(Z[,-c(1, i, grep(paste(unitName, '_', sep = ''), colnames(Z)))])
+        V1      = scale(Z1, scale = FALSE)
+        V0      = scale(Z0, scale = FALSE)
+        fit     = cv.glmnet(x = V0, y = V1,
+                            alpha = a,
+                            standardize = FALSE,
+                            intercept = FALSE,
+                            lower.limits = lower_limit_weights,
+                            upper.limits = upper_limit_weights,
+                            pmax = max_number_units,
+                            nfolds = nfolds)
+        err_alpha_lambda$error[j + (i-1)*na]      = fit$cvm[fit$lambda == fit$lambda.min]
+        err_alpha_lambda$opt_lambda[j + (i-1)*na] = fit$lambda[fit$lambda == fit$lambda.min]
+        
+      }
+    }
+    
+    err_alpha_lambda_opt = err_alpha_lambda %>% 
+      group_by(unit) %>%
+      summarise(a = a[which.min(error)], lambda = opt_lambda[which.min(error)], error = min(error))
+    
+  }
+  else {
+    err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, unit = colnames(Y)[1])
     for (j in 1:na) {
-      a       = a_grid[j]
-      Y1       = as.matrix(Y[,i, drop = F])
+      a        = a_grid[j]
+      Y1       = as.matrix(Y[,1, drop = F])
       unitName = gsub('_[0-9]+', '', colnames(Y1))
-      Y0       = as.matrix(Y[,-c(1, i, grep(paste(unitName, '_', sep = ''), colnames(Y)))])
+      Y0       = as.matrix(Y[,-c(1)])
       Z1       = as.matrix(Z[,i, drop = F])
-      Z0       = as.matrix(Z[,-c(1, i, grep(paste(unitName, '_', sep = ''), colnames(Z)))])
+      Z0       = as.matrix(Z[,-c(1)])
       V1      = scale(Z1, scale = FALSE)
       V0      = scale(Z0, scale = FALSE)
       fit     = cv.glmnet(x = V0, y = V1,
@@ -102,15 +135,20 @@ ElasticSynth = function(
                           upper.limits = upper_limit_weights,
                           pmax = max_number_units,
                           nfolds = nfolds)
-      err_alpha_lambda$error[j + (i-1)*na]      = fit$cvm[fit$lambda == fit$lambda.min]
-      err_alpha_lambda$opt_lambda[j + (i-1)*na] = fit$lambda[fit$lambda == fit$lambda.min]
+      err_alpha_lambda$error[j]      = fit$cvm[fit$lambda == fit$lambda.min]
+      err_alpha_lambda$opt_lambda[j] = fit$lambda[fit$lambda == fit$lambda.min]
       
     }
+    
+    err_alpha_lambda_opt_new = err_alpha_lambda %>% 
+      group_by(unit) %>%
+      summarise(a = a[which.min(error)], lambda = opt_lambda[which.min(error)], error = min(error))
+    
+    err_alpha_lambda_opt = err_alpha_lambda_opt[-1,]
+    err_alpha_lambda_opt = rbind(err_alpha_lambda_opt_new, err_alpha_lambda_opt)
   }
+  ###### Cross validation for many lambda over given alpha
   
-  err_alpha_lambda_opt = err_alpha_lambda %>% 
-    group_by(unit) %>%
-    summarise(a = a[which.min(error)], lambda = opt_lambda[which.min(error)])
   
   int_elast   = matrix(0, nrow = 1, ncol = 1)
   Y_elast     = matrix(0, nrow = Time, ncol = 1)
@@ -183,6 +221,22 @@ ElasticSynth = function(
     
   }
   new_frame     = merge(new_frame, month_join, by = 'time', all.x = TRUE)
+  percent_frame = subset(new_frame, time %in% post) %>%
+                      mutate(p_stat_lower = rank(gaps)/length(gaps),
+                             p_stat_above = 1 - (rank(gaps)/length(gaps)),
+                             p_stat_two_tail = ifelse(rank(gaps)/length(gaps) > 0.5, 1 - (rank(gaps)/length(gaps)), rank(gaps)/length(gaps)))
+  
+  if (test == 'lower') {
+    p_stat = subset(percent_frame, unit_type == 'Treated Unit')$p_stat_lower
+  }
+  else if (test == 'upper') {
+    p_stat = subset(percent_frame, unit_type == 'Treated Unit')$p_stat_upper
+  }
+  else if (test == 'two-tail') {
+    p_stat = subset(percent_frame, unit_type == 'Treated Unit')$p_stat_two_tail
+  }
+  
+  
   min_post_month = unique(new_frame$month[new_frame$time == min(post)])
   max_post_month = unique(new_frame$month[new_frame$time == max(post)])
   far_x_axis_month = max_post_month %m+% months(2)
@@ -205,8 +259,7 @@ ElasticSynth = function(
     xlim(c(as.Date(near_x_axis_month), as.Date(far_x_axis_month)))
   
   
-  
-  
+
   # treated unit
   
   
@@ -220,7 +273,8 @@ ElasticSynth = function(
               placebo = placebo,
               path.plot = path.plot,
               dev.ratio = dev.ratio,
-              err_alpha_lambda_opt = err_alpha_lambda_opt))
+              err_alpha_lambda_opt = err_alpha_lambda_opt,
+              p_stat = p_stat))
   
   
 }
