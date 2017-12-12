@@ -77,12 +77,12 @@ ElasticSynth = function(
   end_month = as.Date(end_month)
   month_seq  = seq(start_month, end_month, by = time_unit)
   month_join = data.frame(time = 1:max(post), month = month_seq)
- 
+  na  = length(a_grid)
+  
   
   cat('\n\n\n\n******* Cross Validation *******n\n\n\n')
   
   if (is.null(err_alpha_lambda_opt)) {
-    na                  = length(a_grid)
     err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, unit = colnames(Y))
     
     
