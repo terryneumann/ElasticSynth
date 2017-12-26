@@ -57,7 +57,8 @@ GenerateBootstrapUnits = function(lower_geog_frame,
         group_by_(higher_geog_colname, date_colname) %>%
         summarise_(aggregate_colname = (~sum(aggregate_colname)) %>%
                      interp(aggregate_colname = as.name(aggregate_colname))
-        ) 
+        )
+      names(new_district_tmp) = c(higher_geog_colname, date_colname, aggregate_colname)
       
       
       new_district_tmp[[higher_geog_colname]] = as.character(paste(new_district_tmp[[higher_geog_colname]], n, sep = '_'))
