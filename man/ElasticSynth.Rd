@@ -7,7 +7,7 @@
 ElasticSynth(OutcomeMatrix, treated, pre, post, a_grid = seq(from = 0.1, to =
   0.9, by = 0.1), start_month, end_month, time_unit,
   max_number_units = ncol(OutcomeMatrix), lower_limit_weights = 0,
-  upper_limit_weights = 1, nfolds = 5)
+  upper_limit_weights = 1, nfolds = 5, test, err_alpha_lambda_opt = NULL)
 }
 \arguments{
 \item{OutcomeMatrix}{a t x n matrix where each row is the outcome variable of interest at time t for each unit}
@@ -33,6 +33,8 @@ ElasticSynth(OutcomeMatrix, treated, pre, post, a_grid = seq(from = 0.1, to =
 \item{upper_limit_weights}{The upper limit value of weight that can be placed on any unit. Default is one.}
 
 \item{nfolds}{The number of folds used in cross validation. The default is 5.}
+
+\item{test}{Hypothesis test - 'lower', 'upper', or 'two-sided'}
 
 \item{penaltyMat}{glmnet param - (optional) a n-1 x n matrix of additional penalties placed upon glmnet for selecting certain units. Useful in the case of multiple treated units. Each column of the matrix represents the penalties to be placed on the control units. The treated unit is excluded from the column. See glmnet param penalty.factor for more details. Default is no additional penalties on any unit.}
 }
