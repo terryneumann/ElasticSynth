@@ -42,6 +42,8 @@ ElasticSynth = function(
   suppressMessages(library(glmnet))
   suppressMessages(library(ggplot2))
   suppressMessages(library(lubridate))
+  suppressMessages(library(dplyr))
+  suppressMessages(library(tidyr))
   
   set.seed(12345)
   
