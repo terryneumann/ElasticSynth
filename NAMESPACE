@@ -3,3 +3,4 @@
 export(ElasticSynth)
 export(ElasticSynthCovariates)
 export(ElasticSynthRun)
+export(GenerateBootstrapUnits)
