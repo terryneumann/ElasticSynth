@@ -232,7 +232,7 @@ ElasticSynth = function(
     p_stat = subset(percent_frame, unit_type == 'Treated Unit')$p_stat_lower
   }
   else if (test == 'upper') {
-    p_stat = subset(percent_frame, unit_type == 'Treated Unit')$p_stat_upper
+    p_stat = subset(percent_frame, unit_type == 'Treated Unit')$p_stat_above
   }
   else if (test == 'two-tail') {
     p_stat = subset(percent_frame, unit_type == 'Treated Unit')$p_stat_two_tail
