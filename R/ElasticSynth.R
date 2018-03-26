@@ -67,7 +67,7 @@ ElasticSynth = function(
   # Number of units
   N  = dim(Y)[2]
   # Total time periods
-  Time = length(c(pre,post))
+  Time = length(c(min(pre):max(post)))
   # Pre period
   T0   = length(pre)
   # Post Period
