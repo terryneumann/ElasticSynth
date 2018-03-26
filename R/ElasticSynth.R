@@ -185,12 +185,12 @@ ElasticSynth = function(
       int_elast   = as.matrix(apply(Z1 - Z0 %*% w_final, 2, mean))
       Y_elast     = int_elast[rep(1, Time),] + Y0 %*% w_final
       Y_elast_final = Y_elast
-      Y_true      = Y1[c(1:max(pre),post)]
+      Y_true      = Y1[min(pre):max(post)]
       Y_true_final = Y_true
-      gaps        = Y_true[c(1:max(pre),post)] - Y_elast[c(1:max(pre),post)]
+      gaps        = Y_true[c(min(pre):max(post))] - Y_elast[c(min(pre):max(post))]
       
       
-      plotFrame   = data.frame(time = c(pre,post), Y_true = Y_true, Y_elast = Y_elast, gaps = gaps)
+      plotFrame   = data.frame(time = c(min(pre):max(post)), Y_true = Y_true, Y_elast = Y_elast, gaps = gaps)
       plotFrame   = merge(plotFrame, month_join, by = 'time', all.x = TRUE)
       min_post_month = plotFrame$month[plotFrame$time == min(post)]
       max_post_month = plotFrame$month[plotFrame$time == max(post)]
@@ -217,8 +217,8 @@ ElasticSynth = function(
     int_elast   = as.matrix(apply(Z1 - Z0 %*% w, 2, mean))
     Y_elast     = int_elast[rep(1, Time),] + Y0 %*% w
     Y_true      = Y1
-    gaps        = Y_true[c(1:max(pre),post)] - Y_elast[c(1:max(pre),post)]
-    new_frame   = data.frame(gaps = unlist(gaps), time = c(1:max(pre),post), unit_type = ifelse(i == 1, 'Treated Unit', 'Control Unit Distribution'), unit = colnames(Y)[i])
+    gaps        = Y_true[c(min(pre):max(post))] - Y_elast[c(min(pre):max(post))]
+    new_frame   = data.frame(gaps = unlist(gaps), time = c(min(pre):max(post)), unit_type = ifelse(i == 1, 'Treated Unit', 'Control Unit Distribution'), unit = colnames(Y)[i])
     new_frame   = rbind(old_frame, new_frame)
     
   }
