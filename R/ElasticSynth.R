@@ -78,7 +78,7 @@ ElasticSynth = function(
   start_month = as.Date(start_month)
   end_month = as.Date(end_month)
   month_seq  = seq(start_month, end_month, by = time_unit)
-  month_join = data.frame(time = 1:max(post), month = month_seq)
+  month_join = data.frame(time = c(min(pre):max(post)), month = month_seq)
   na  = length(a_grid)
   
   
@@ -120,26 +120,28 @@ ElasticSynth = function(
   }
   else {
     err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, unit = colnames(Y)[1])
-    for (j in 1:na) {
-      a        = a_grid[j]
-      Y1       = as.matrix(Y[,1, drop = F])
-      unitName = gsub('_[0-9]+', '', colnames(Y1))
-      Y0       = as.matrix(Y[,-c(1)])
-      Z1       = as.matrix(Z[,i, drop = F])
-      Z0       = as.matrix(Z[,-c(1)])
-      V1      = scale(Z1, scale = FALSE)
-      V0      = scale(Z0, scale = FALSE)
-      fit     = cv.glmnet(x = V0, y = V1,
-                          alpha = a,
-                          standardize = FALSE,
-                          intercept = FALSE,
-                          lower.limits = lower_limit_weights,
-                          upper.limits = upper_limit_weights,
-                          pmax = max_number_units,
-                          nfolds = nfolds)
-      err_alpha_lambda$error[j]      = fit$cvm[fit$lambda == fit$lambda.min]
-      err_alpha_lambda$opt_lambda[j] = fit$lambda[fit$lambda == fit$lambda.min]
-      
+    for (i in 1:N) {
+      cat('*** Unit', colnames(Y[,i,drop = F]), '***\n\n')
+      for (j in 1:na) {
+        a        = a_grid[j]
+        Y1       = as.matrix(Y[,1, drop = F])
+        unitName = gsub('_[0-9]+', '', colnames(Y1))
+        Y0       = as.matrix(Y[,-c(1)])
+        Z1       = as.matrix(Z[,i, drop = F])
+        Z0       = as.matrix(Z[,-c(1)])
+        V1      = scale(Z1, scale = FALSE)
+        V0      = scale(Z0, scale = FALSE)
+        fit     = cv.glmnet(x = V0, y = V1,
+                            alpha = a,
+                            standardize = FALSE,
+                            intercept = FALSE,
+                            lower.limits = lower_limit_weights,
+                            upper.limits = upper_limit_weights,
+                            pmax = max_number_units,
+                            nfolds = nfolds)
+        err_alpha_lambda$error[j]      = fit$cvm[fit$lambda == fit$lambda.min]
+        err_alpha_lambda$opt_lambda[j] = fit$lambda[fit$lambda == fit$lambda.min]
+        }
     }
     
     err_alpha_lambda_opt_new = err_alpha_lambda %>% 
