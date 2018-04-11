@@ -91,7 +91,7 @@ ElasticSynth = function(
     
     
     for (i in 1:N) {
-      if (verbose = T) {
+      if (verbose == T) {
         cat('*** Unit', colnames(Y[,i,drop = F]), '***\n\n')
       }
       for (j in 1:na) {
