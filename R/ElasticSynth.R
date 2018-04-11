@@ -18,6 +18,7 @@
 #' @param upper_limit_weights The upper limit value of weight that can be placed on any unit. Default is one.
 #' @param nfolds The number of folds used in cross validation. The default is 5.
 #' @param test Hypothesis test - 'lower', 'upper', or 'two-sided'
+#' @param verbose Print unit status during cross validation?
 #' @return list containing output weights for treated unit (w_final), the actual outcome values (Y_true), the fitted outcome values (Y_elast), optimal value of lambda (lambda_opt), optimal value of alpha, (alpha_opt), a dataframe of the results of placebo test (placebo_frame), a plot of the path of the treated vs. actual unit (path.plot), the deviation ratio of the fitted series (dev.ratio), and a plot of the placebo test results for the treated unit. 
 #' @export
 
@@ -35,7 +36,8 @@ ElasticSynth = function(
   upper_limit_weights = 1,
   nfolds = 5,
   test,
-  err_alpha_lambda_opt = NULL) 
+  err_alpha_lambda_opt = NULL,
+  verbose = T) 
 {
   
   
@@ -67,7 +69,7 @@ ElasticSynth = function(
   # Number of units
   N  = dim(Y)[2]
   # Total time periods
-  Time = length(c(min(pre):max(post)))
+  Time = length(c(pre,post))
   # Pre period
   T0   = length(pre)
   # Post Period
@@ -78,7 +80,7 @@ ElasticSynth = function(
   start_month = as.Date(start_month)
   end_month = as.Date(end_month)
   month_seq  = seq(start_month, end_month, by = time_unit)
-  month_join = data.frame(time = c(min(pre):max(post)), month = month_seq)
+  month_join = data.frame(time = 1:max(post), month = month_seq)
   na  = length(a_grid)
   
   
@@ -89,7 +91,9 @@ ElasticSynth = function(
     
     
     for (i in 1:N) {
-      cat('*** Unit', colnames(Y[,i,drop = F]), '***\n\n')
+      if (verbose = T) {
+        cat('*** Unit', colnames(Y[,i,drop = F]), '***\n\n')
+      }
       for (j in 1:na) {
         a       = a_grid[j]
         Y1       = as.matrix(Y[,i, drop = F])
@@ -120,28 +124,26 @@ ElasticSynth = function(
   }
   else {
     err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, unit = colnames(Y)[1])
-    for (i in 1:N) {
-      cat('*** Unit', colnames(Y[,i,drop = F]), '***\n\n')
-      for (j in 1:na) {
-        a        = a_grid[j]
-        Y1       = as.matrix(Y[,1, drop = F])
-        unitName = gsub('_[0-9]+', '', colnames(Y1))
-        Y0       = as.matrix(Y[,-c(1)])
-        Z1       = as.matrix(Z[,i, drop = F])
-        Z0       = as.matrix(Z[,-c(1)])
-        V1      = scale(Z1, scale = FALSE)
-        V0      = scale(Z0, scale = FALSE)
-        fit     = cv.glmnet(x = V0, y = V1,
-                            alpha = a,
-                            standardize = FALSE,
-                            intercept = FALSE,
-                            lower.limits = lower_limit_weights,
-                            upper.limits = upper_limit_weights,
-                            pmax = max_number_units,
-                            nfolds = nfolds)
-        err_alpha_lambda$error[j]      = fit$cvm[fit$lambda == fit$lambda.min]
-        err_alpha_lambda$opt_lambda[j] = fit$lambda[fit$lambda == fit$lambda.min]
-        }
+    for (j in 1:na) {
+      a        = a_grid[j]
+      Y1       = as.matrix(Y[,1, drop = F])
+      unitName = gsub('_[0-9]+', '', colnames(Y1))
+      Y0       = as.matrix(Y[,-c(1)])
+      Z1       = as.matrix(Z[,i, drop = F])
+      Z0       = as.matrix(Z[,-c(1)])
+      V1      = scale(Z1, scale = FALSE)
+      V0      = scale(Z0, scale = FALSE)
+      fit     = cv.glmnet(x = V0, y = V1,
+                          alpha = a,
+                          standardize = FALSE,
+                          intercept = FALSE,
+                          lower.limits = lower_limit_weights,
+                          upper.limits = upper_limit_weights,
+                          pmax = max_number_units,
+                          nfolds = nfolds)
+      err_alpha_lambda$error[j]      = fit$cvm[fit$lambda == fit$lambda.min]
+      err_alpha_lambda$opt_lambda[j] = fit$lambda[fit$lambda == fit$lambda.min]
+      
     }
     
     err_alpha_lambda_opt_new = err_alpha_lambda %>% 
@@ -187,12 +189,12 @@ ElasticSynth = function(
       int_elast   = as.matrix(apply(Z1 - Z0 %*% w_final, 2, mean))
       Y_elast     = int_elast[rep(1, Time),] + Y0 %*% w_final
       Y_elast_final = Y_elast
-      Y_true      = Y1[min(pre):max(post)]
+      Y_true      = Y1[c(1:max(pre),post)]
       Y_true_final = Y_true
-      gaps        = Y_true[c(min(pre):max(post))] - Y_elast[c(min(pre):max(post))]
+      gaps        = Y_true[c(1:max(pre),post)] - Y_elast[c(1:max(pre),post)]
       
       
-      plotFrame   = data.frame(time = c(min(pre):max(post)), Y_true = Y_true, Y_elast = Y_elast, gaps = gaps)
+      plotFrame   = data.frame(time = c(pre,post), Y_true = Y_true, Y_elast = Y_elast, gaps = gaps)
       plotFrame   = merge(plotFrame, month_join, by = 'time', all.x = TRUE)
       min_post_month = plotFrame$month[plotFrame$time == min(post)]
       max_post_month = plotFrame$month[plotFrame$time == max(post)]
@@ -219,16 +221,16 @@ ElasticSynth = function(
     int_elast   = as.matrix(apply(Z1 - Z0 %*% w, 2, mean))
     Y_elast     = int_elast[rep(1, Time),] + Y0 %*% w
     Y_true      = Y1
-    gaps        = Y_true[c(min(pre):max(post))] - Y_elast[c(min(pre):max(post))]
-    new_frame   = data.frame(gaps = unlist(gaps), time = c(min(pre):max(post)), unit_type = ifelse(i == 1, 'Treated Unit', 'Control Unit Distribution'), unit = colnames(Y)[i])
+    gaps        = Y_true[c(1:max(pre),post)] - Y_elast[c(1:max(pre),post)]
+    new_frame   = data.frame(gaps = unlist(gaps), time = c(1:max(pre),post), unit_type = ifelse(i == 1, 'Treated Unit', 'Control Unit Distribution'), unit = colnames(Y)[i])
     new_frame   = rbind(old_frame, new_frame)
     
   }
   new_frame     = merge(new_frame, month_join, by = 'time', all.x = TRUE)
   percent_frame = subset(new_frame, time %in% post) %>%
-                      mutate(p_stat_lower = rank(gaps)/length(gaps),
-                             p_stat_above = 1 - (rank(gaps)/length(gaps)),
-                             p_stat_two_tail = ifelse(rank(gaps)/length(gaps) > 0.5, 1 - (rank(gaps)/length(gaps)), rank(gaps)/length(gaps)))
+    mutate(p_stat_lower = rank(gaps)/length(gaps),
+           p_stat_above = 1 - (rank(gaps)/length(gaps)),
+           p_stat_two_tail = ifelse(rank(gaps)/length(gaps) > 0.5, 1 - (rank(gaps)/length(gaps)), rank(gaps)/length(gaps)))
   
   if (test == 'lower') {
     p_stat = subset(percent_frame, unit_type == 'Treated Unit')$p_stat_lower
@@ -263,7 +265,7 @@ ElasticSynth = function(
     xlim(c(as.Date(near_x_axis_month), as.Date(far_x_axis_month)))
   
   
-
+  
   # treated unit
   
   
@@ -271,8 +273,8 @@ ElasticSynth = function(
               Y_true = Y_true_final, 
               Y_elast = Y_elast_final, 
               fit = fit_final, 
-          #    lambda_opt = lambda_opt, 
-          #    alpha_opt = a_opt,
+              #    lambda_opt = lambda_opt, 
+              #    alpha_opt = a_opt,
               placebo_frame = new_frame,
               placebo = placebo,
               path.plot = path.plot,
@@ -282,4 +284,3 @@ ElasticSynth = function(
   
   
 }
-
