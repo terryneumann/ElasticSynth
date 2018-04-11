@@ -91,9 +91,11 @@ ElasticSynth = function(
     
     
     for (i in 1:N) {
+      
       if (verbose == T) {
         cat('*** Unit', colnames(Y[,i,drop = F]), '***\n\n')
       }
+      
       for (j in 1:na) {
         a       = a_grid[j]
         Y1       = as.matrix(Y[,i, drop = F])
