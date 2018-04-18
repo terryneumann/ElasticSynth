@@ -46,6 +46,7 @@ ElasticSynth = function(
   suppressMessages(library(lubridate))
   suppressMessages(library(dplyr))
   suppressMessages(library(tidyr))
+  suppressMessages(library(Metrics))
   
   set.seed(12345)
   
@@ -193,8 +194,8 @@ ElasticSynth = function(
       Y_elast_final = Y_elast
       Y_true      = Y1[c(1:max(pre),post)]
       Y_true_final = Y_true
-      gaps        = Y_true[c(1:max(pre),post)] - Y_elast[c(1:max(pre),post)]
-      
+      gaps          = Y_true[c(1:max(pre),post)] - Y_elast[c(1:max(pre),post)]
+      Y_smape       = smape(Y_elast, Y_true)
       
       plotFrame   = data.frame(time = c(pre,post), Y_true = Y_true, Y_elast = Y_elast, gaps = gaps)
       plotFrame   = merge(plotFrame, month_join, by = 'time', all.x = TRUE)
@@ -280,6 +281,7 @@ ElasticSynth = function(
               placebo_frame = new_frame,
               placebo = placebo,
               path.plot = path.plot,
+              smape = Y_smape,
               dev.ratio = dev.ratio,
               err_alpha_lambda_opt = err_alpha_lambda_opt,
               p_stat = p_stat))
