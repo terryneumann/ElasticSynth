@@ -291,8 +291,7 @@ ElasticSynth = function(
               smape = Y_smape,
               dev.ratio = dev.ratio,
               err_alpha_lambda_opt = err_alpha_lambda_opt,
-              p_stat = p_stat,
-              mse_frame = err_alpha_lambda_opt))
+              p_stat = p_stat))
   
   
 }
