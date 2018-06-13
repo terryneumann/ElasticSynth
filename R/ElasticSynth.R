@@ -113,7 +113,8 @@ ElasticSynth = function(
                             lower.limits = lower_limit_weights,
                             upper.limits = upper_limit_weights,
                             pmax = max_number_units,
-                            nfolds = nfolds)
+                            nfolds = nfolds,
+                            type.measure = 'mse')
         err_alpha_lambda$error[j + (i-1)*na]      = fit$cvm[fit$lambda == fit$lambda.min]
         err_alpha_lambda$opt_lambda[j + (i-1)*na] = fit$lambda[fit$lambda == fit$lambda.min]
         
@@ -158,7 +159,7 @@ ElasticSynth = function(
   }
   ###### Cross validation for many lambda over given alpha
   
-  
+  err_alpha_lambda_opt$error_post = rep(0, N)
   int_elast   = matrix(0, nrow = 1, ncol = 1)
   Y_elast     = matrix(0, nrow = Time, ncol = 1)
   Y_true      = matrix(0, nrow = Time, ncol = 1)
@@ -186,8 +187,7 @@ ElasticSynth = function(
                          upper.limits = upper_limit_weights)
     w           = as.matrix(coef(fit_final, s = err_alpha_lambda_opt$lambda[i]))[-1,]
     if (i == 1) {
-      fit_treated = fit_final
-      dev.ratio   = max(fit_final$dev.ratio)
+
       w_final     = w
       int_elast   = as.matrix(apply(Z1 - Z0 %*% w_final, 2, mean))
       Y_elast     = int_elast[rep(1, Time),] + Y0 %*% w_final
@@ -195,7 +195,8 @@ ElasticSynth = function(
       Y_true      = Y1[c(1:max(pre),post)]
       Y_true_final = Y_true
       gaps          = Y_true[c(1:max(pre),post)] - Y_elast[c(1:max(pre),post)]
-      Y_smape       = smape(Y_elast[1:max(pre)], Y_true[1:max(pre)])
+      Y_smape       = Metrics::smape(Y_elast[1:max(pre)], Y_true[1:max(pre)])
+      
       
       plotFrame   = data.frame(time = c(pre,post), Y_true = Y_true, Y_elast = Y_elast, gaps = gaps)
       plotFrame   = merge(plotFrame, month_join, by = 'time', all.x = TRUE)
@@ -224,6 +225,7 @@ ElasticSynth = function(
     int_elast   = as.matrix(apply(Z1 - Z0 %*% w, 2, mean))
     Y_elast     = int_elast[rep(1, Time),] + Y0 %*% w
     Y_true      = Y1
+    err_alpha_lambda_opt$error_post[i] = Metrics::mse(Y_true[post], Y_elast[post])
     gaps        = Y_true[c(1:max(pre),post)] - Y_elast[c(1:max(pre),post)]
     new_frame   = data.frame(gaps = unlist(gaps),
                              y_true = Y_true[c(1:max(pre),post)], 
@@ -289,7 +291,8 @@ ElasticSynth = function(
               smape = Y_smape,
               dev.ratio = dev.ratio,
               err_alpha_lambda_opt = err_alpha_lambda_opt,
-              p_stat = p_stat))
+              p_stat = p_stat,
+              mse_frame = err_alpha_lambda_opt))
   
   
 }
