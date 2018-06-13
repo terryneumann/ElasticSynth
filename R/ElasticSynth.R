@@ -154,6 +154,8 @@ ElasticSynth = function(
       group_by(unit) %>%
       summarise(a = a[which.min(error)], lambda = opt_lambda[which.min(error)], error = min(error))
     
+    err_alpha_lambda_opt_new$error_post = rep(0, 1)
+    
     err_alpha_lambda_opt = err_alpha_lambda_opt[-1,]
     err_alpha_lambda_opt = rbind(err_alpha_lambda_opt_new, err_alpha_lambda_opt)
   }
