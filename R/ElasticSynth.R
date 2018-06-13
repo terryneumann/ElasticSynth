@@ -88,7 +88,7 @@ ElasticSynth = function(
   cat('\n\n\n\n******* Cross Validation *******n\n\n\n')
   
   if (is.null(err_alpha_lambda_opt)) {
-    err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, unit = colnames(Y))
+    err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, sd = 0, unit = colnames(Y))
     
     
     for (i in 1:N) {
@@ -116,6 +116,7 @@ ElasticSynth = function(
                             nfolds = nfolds,
                             type.measure = 'mse')
         err_alpha_lambda$error[j + (i-1)*na]      = fit$cvm[fit$lambda == fit$lambda.min]
+        err_alpha_lambda$sd[j + (i-1)*na]         = fit$cvsd[fit$lambda == fit$lambda.min]
         err_alpha_lambda$opt_lambda[j + (i-1)*na] = fit$lambda[fit$lambda == fit$lambda.min]
         
       }
@@ -123,11 +124,11 @@ ElasticSynth = function(
     
     err_alpha_lambda_opt = err_alpha_lambda %>% 
       group_by(unit) %>%
-      summarise(a = a[which.min(error)], lambda = opt_lambda[which.min(error)], error = min(error))
+      summarise(a = a[which.min(error)], lambda = opt_lambda[which.min(error)], error = min(error), sd = sd[which.min(error)])
     
   }
   else {
-    err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, unit = colnames(Y)[1])
+    err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, sd = 0, unit = colnames(Y)[1])
     for (j in 1:na) {
       a        = a_grid[j]
       Y1       = as.matrix(Y[,1, drop = F])
@@ -146,13 +147,14 @@ ElasticSynth = function(
                           pmax = max_number_units,
                           nfolds = nfolds)
       err_alpha_lambda$error[j]      = fit$cvm[fit$lambda == fit$lambda.min]
+      err_alpha_lambda$sd[j]         = fit$cvsd[fit$lambda == fit$lambda.min]
       err_alpha_lambda$opt_lambda[j] = fit$lambda[fit$lambda == fit$lambda.min]
       
     }
     
     err_alpha_lambda_opt_new = err_alpha_lambda %>% 
       group_by(unit) %>%
-      summarise(a = a[which.min(error)], lambda = opt_lambda[which.min(error)], error = min(error))
+      summarise(a = a[which.min(error)], lambda = opt_lambda[which.min(error)], sd = sd[which.min(error)], error = min(error))
     
     err_alpha_lambda_opt_new$error_post = rep(0, 1)
     
