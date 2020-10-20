@@ -1,301 +1,769 @@
-#' ElasticSynth
-#'
-#' A synthetic controls method for comparitive case studies
-#' that utilizes elastic net regression -- glmnet -- to assign unit weights. 
-#' Utilizes a cross-validation mechanism for selecting optimal L1 and L2 regularization parameters, as well as lambda.
-#' 
-#' @param OutcomeMatrix a t x n matrix where each row is the outcome variable of interest at time t for each unit
-#' @param treated the column index for the treated unit in both PredictorMatrix and OutcomeMatrix. For multiple treated units, see 'ElasticSynthRun'
-#' @param pre a vector of row indices indicating the pre period (Ex. 1:40). This is the period over which the algorithm will optimize weights.
-#' @param post a vector of row indices indicating the post period (Ex. 41:50)
-#' @param a_grid glmnet param - a vector of values for alpha to be fitted in cross validation
-#' @param start_month the start month of the case study (first pre-period). This is used for plotting
-#' @param end_month the end month of the case study (last post-period). This is used for plotting
-#' @param time_unit The gap between observations in the case study. No default. A character string, containing one of "day", "week", "month", "quarter" or "year". This can optionally be preceded by an integer and a space, or followed by "s". Ex '3 months' or 'quarter'
-#' @param penaltyMat glmnet param - (optional) a n-1 x n matrix of additional penalties placed upon glmnet for selecting certain units. Useful in the case of multiple treated units. Each column of the matrix represents the penalties to be placed on the control units. The treated unit is excluded from the column. See glmnet param penalty.factor for more details. Default is no additional penalties on any unit.
-#' @param max_number_units glmnet param - The maximum number of units glmnet will select. Useful for forcing parsimonious models. Default allows all units to receive weight.
-#' @param lower_limit_weights The lower limit value of weight that can be placed on any unit. Default is zero (non-negative constraint). Change if desired, but be wary of overfitting.
-#' @param upper_limit_weights The upper limit value of weight that can be placed on any unit. Default is one.
-#' @param nfolds The number of folds used in cross validation. The default is 5.
-#' @param test Hypothesis test - 'lower', 'upper', or 'two-sided'
-#' @param verbose Print unit status during cross validation?
-#' @return list containing output weights for treated unit (w_final), the actual outcome values (Y_true), the fitted outcome values (Y_elast), optimal value of lambda (lambda_opt), optimal value of alpha, (alpha_opt), a dataframe of the results of placebo test (placebo_frame), a plot of the path of the treated vs. actual unit (path.plot), the deviation ratio of the fitted series (dev.ratio), and a plot of the placebo test results for the treated unit. 
+#' @importFrom R6 R6Class
 #' @export
 
-ElasticSynth = function(
-  OutcomeMatrix, 
-  treated, 
-  pre, 
-  post,   
-  a_grid =seq(from = 0.1, to = 0.9, by = 0.1),
-  start_month,
-  end_month,
-  time_unit,
-  max_number_units = ncol(OutcomeMatrix),
-  lower_limit_weights = 0,
-  upper_limit_weights = 1,
-  nfolds = 5,
-  test,
-  err_alpha_lambda_opt = NULL,
-  verbose = T) 
-{
-  
-  
-  suppressMessages(library(glmnet))
-  suppressMessages(library(ggplot2))
-  suppressMessages(library(lubridate))
-  suppressMessages(library(dplyr))
-  suppressMessages(library(tidyr))
-  suppressMessages(library(Metrics))
-  
-  set.seed(12345)
-  
-  ####  data structure
-  
-  # Time Periods for units minus treated
-  Y0 = as.matrix(OutcomeMatrix[,-treated])
-  # Time Periods for treated
-  Y1 = as.matrix(OutcomeMatrix[,treated, drop = F])
-  # Combined
-  Y  = as.matrix(cbind(Y1, Y0))
-  # Pre period units minus treated
-  Z0 = as.matrix(Y0[pre,])
-  # Pre period for treated
-  Z1 = as.matrix(Y1[pre,1,drop = F])
-  # Combined
-  Z  = as.matrix(cbind(Z1, Z0))
-  
-  ##### Params
-  
-  # Number of units
-  N  = dim(Y)[2]
-  # Total time periods
-  Time = length(c(pre,post))
-  # Pre period
-  T0   = length(pre)
-  # Post Period
-  T1   = length(post)
-  
-  
-  ## Month frame for plotting
-  start_month = as.Date(start_month)
-  end_month = as.Date(end_month)
-  month_seq  = seq(start_month, end_month, by = time_unit)
-  month_join = data.frame(time = 1:max(post), month = month_seq)
-  na  = length(a_grid)
-  
-  
-  cat('\n\n\n\n******* Cross Validation *******n\n\n\n')
-  
-  if (is.null(err_alpha_lambda_opt)) {
-    err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, sd = 0, unit = colnames(Y))
-    
-    
-    for (i in 1:N) {
+#' ElasticSynth - a class for running synthetic controls with elastic net regularization
+#'
+#'
+#' Model is initiated with a list of parameters most which include treated_units and donor_units, two dataframes that 
+#' contain time periods, units, and counts of 
+
+
+
+ElasticSynth <- R6::R6Class(
+  class = FALSE,
+  private = list(
+    cv_results = NULL,
+    weights = NULL,
+    series_frame = NULL,
+    type = NULL
+  ),
+  public = list(
+    treated_units = NULL,
+    donor_units = NULL,
+    measure_vars = NULL,
+    measure_col = NULL,
+    unit_col = NULL,
+    time_col = NULL,
+    value_col = NULL,
+    pre_list = NULL,
+    post_list = NULL,
+    start_cv_list = NULL,
+    end_cv_list = NULL,
+    cv_step_list = NULL,
+    start_month_list = NULL,
+    end_month_list = NULL,
+    time_unit_list = NULL,
+    alphas = NULL,
+    lambdas = NULL,
+    lower_limit_weights = NULL,
+    upper_limit_weights = NULL,
+    placebo = NULL,
+    verbose = NULL,
+    treated = NULL,
+    max_pre_month = NULL,
+    end_month = NULL,
+    start_month = NULL,
+    class_name = 'ElasticSynth',
+    initialize = function(treated_units,
+                         donor_units,
+                         measure_vars,
+                         measure_col,
+                         unit_col,
+                         time_col,
+                         value_col,
+                         pre_list,
+                         post_list,
+                         start_cv_list,
+                         end_cv_list,
+                         cv_step_list,
+                         start_month_list,
+                         end_month_list,
+                         time_unit_list,
+                         alphas = NULL,
+                         lambdas = NULL,
+                         lower_limit_weights,
+                         upper_limit_weights,
+                         placebo,
+                         verbose,
+                         max_pre_month,
+                         end_month,
+                         start_month
+    )
+    {
+      ### load packages
+      suppressMessages(library(glmnet))
+      suppressMessages(library(ggplot2))
+      suppressMessages(library(lubridate))
+      suppressMessages(library(dplyr))
+      suppressMessages(library(tidyr))
+      suppressMessages(library(Metrics))
+      suppressMessages(library(reshape2))
+      suppressMessages(library(data.table))
+      suppressMessages(library(ggplot2))
       
-      if (verbose == T) {
-        cat('*** Unit', colnames(Y[,i,drop = F]), '***\n\n')
+      
+      if (is.null(alphas)) {
+        alphas <- seq(0, 1, by = 0.05)
       }
       
-      for (j in 1:na) {
-        a       = a_grid[j]
-        Y1       = as.matrix(Y[,i, drop = F])
-        unitName = gsub('_[0-9]+', '', colnames(Y1))
-        Y0       = as.matrix(Y[,-c(1, i, grep(paste(unitName, '_', sep = ''), colnames(Y)))])
-        Z1       = as.matrix(Z[,i, drop = F])
-        Z0       = as.matrix(Z[,-c(1, i, grep(paste(unitName, '_', sep = ''), colnames(Z)))])
-        V1      = scale(Z1, scale = FALSE)
-        V0      = scale(Z0, scale = FALSE)
-        fit     = cv.glmnet(x = V0, y = V1,
-                            alpha = a,
-                            standardize = FALSE,
-                            intercept = FALSE,
-                            lower.limits = lower_limit_weights,
-                            upper.limits = upper_limit_weights,
-                            pmax = max_number_units,
-                            nfolds = nfolds,
-                            type.measure = 'mse')
-        err_alpha_lambda$error[j + (i-1)*na]      = fit$cvm[fit$lambda == fit$lambda.min]
-        err_alpha_lambda$sd[j + (i-1)*na]         = fit$cvsd[fit$lambda == fit$lambda.min]
-        err_alpha_lambda$opt_lambda[j + (i-1)*na] = fit$lambda[fit$lambda == fit$lambda.min]
+      if (is.null(lambdas)) {
+        lambdas <-
+          c(seq(1, 0.02, by = -0.1),
+            seq(0.1, 0.0001, by = -.0005),
+            0.0001,
+            0.00005)
+      }
+      
+      if (is.null(lower_limit_weights)) {
+        lower_limit_weights <- 0
+      }
+      
+      if (is.null(upper_limit_weights)) {
+        upper_limit_weights <- 1
+      }
+      
+      
+      ### Check types
+      stopifnot(is.data.frame(treated_units))
+      stopifnot(is.data.frame(donor_units))
+      stopifnot(is.character(measure_vars))
+      stopifnot(is.character(measure_col))
+      stopifnot(is.character(unit_col))
+      stopifnot(is.character(time_col))
+      stopifnot(is.character(value_col))
+      stopifnot(is.character(start_month_list))
+      stopifnot(is.character(end_month_list))
+      stopifnot(is.character(time_unit_list))
+      stopifnot(is.list(pre_list))
+      stopifnot(is.list(post_list))
+      stopifnot(is.numeric(start_cv_list))
+      stopifnot(is.numeric(end_cv_list))
+      stopifnot(is.numeric(cv_step_list))
+      stopifnot(is.numeric(alphas))
+      stopifnot(is.numeric(lambdas))
+      stopifnot(is.numeric(lower_limit_weights))
+      stopifnot(is.numeric(upper_limit_weights))
+      stopifnot(lower_limit_weights < upper_limit_weights)
+      # -- clean this up
+      stopifnot(lubridate::is.Date(max_pre_month))
+      stopifnot(lubridate::is.Date(start_month))
+      stopifnot(lubridate::is.Date(end_month))
+      # --
+      stopifnot(is.logical(placebo))
+      stopifnot(is.logical(verbose))
+      
+      ### Assign
+      self$treated <- 1
+      self$alphas <- alphas
+      self$lambdas <- lambdas
+      self$treated_units <- treated_units
+      self$donor_units <- donor_units
+      self$measure_vars <- measure_vars
+      self$measure_col <- measure_col
+      self$unit_col <- unit_col
+      self$time_col <- time_col
+      self$value_col <- value_col
+      self$pre_list <- pre_list
+      self$post_list <- post_list
+      self$start_month_list <- start_month_list
+      self$end_month_list <- end_month_list
+      self$start_cv_list <- start_cv_list
+      self$end_cv_list <- end_cv_list
+      self$time_unit_list <- time_unit_list
+      self$cv_step_list <- cv_step_list
+      self$max_pre_month <- max_pre_month
+      self$start_month <- start_month
+      self$end_month <- end_month
+      self$lower_limit_weights <- lower_limit_weights
+      self$upper_limit_weights <- upper_limit_weights
+      self$placebo <- placebo
+      self$verbose <- verbose
+    },
+    
+    cv_treated = function() {
+      
+      treated_units = setDT(self$treated_units)
+      donor_units = setDT(self$donor_units)
+      raw_results = data.frame()
+      for (m in 1:length(self$measure_vars)) {
+        cat(
+          paste(
+            '\n\n\n\n\n\n\nCross Validating for measure:',
+            self$measure_vars[m],
+            '\n\n\n\n\n'
+          )
+        )
+        pre = self$pre_list[[m]]
+        post = self$post_list[[m]]
+        
+        treated_wide_measure = self$long_to_wide(self$treated_units[get(measure_col) == self$measure_vars[m], ],
+                                            self$time_col,
+                                            self$unit_col,
+                                            self$value_col)
+        donor_wide_measure = self$long_to_wide(self$donor_units[get(self$measure_col) == self$measure_vars[m], ],
+                                          self$time_col,
+                                          self$unit_col,
+                                          self$value_col)
+        # generate a list of the hold out periods based on Hyndman CV structure
+        folds_ix = self$generate_hyndman_folds(
+          start_cv = self$start_cv_list[m],
+          end_cv = self$end_cv_list[m],
+          cv_step = self$cv_step_list[m]
+        )
+        ####  data structure
+        OutcomeMatrix = as.matrix(cbind(treated_wide_measure, donor_wide_measure))
+        # Time Periods for units minus treated
+        Y0 = as.matrix(OutcomeMatrix[, -self$treated, drop = F])
+        # Time Periods for treated
+        Y1 = as.matrix(OutcomeMatrix[, self$treated, drop = F])
+        # Combined
+        Y  = as.matrix(cbind(Y1, Y0))
+        # Pre period units minus treated
+        Z0 = as.matrix(Y0[pre, ])
+        # Pre period for treated
+        Z1 = as.matrix(Y1[pre, 1, drop = F])
+        # Combined
+        Z  = as.matrix(cbind(Z1, Z0))
+        
+        
+        # Number of units
+        if (self$placebo == T) {
+          N  = dim(Y)[2]
+        }
+        
+        if (self$placebo == F) {
+          N = 1
+        }
+        
+        ## Month frame for plotting
+        na  = length(self$alphas)
+        
+        cat('\n\n\n\n******* Unit Cross Validation *******\n\n\n\n')
+        
+        units_for_same_measure = data.frame()
+        for (i in 1:N) {
+          if (self$verbose == T) {
+            cat('*** Unit', colnames(Z[, i, drop = F]), '***\n\n')
+          }
+          
+          Z1       = as.matrix(Z[, i, drop = F])
+          Z0       = as.matrix(Z[, -c(1:ncol(treated_wide_measure), i), drop = F])
+          cv_grid = data.frame()
+          for (r in 1:length(folds_ix)) {
+            # hyndman cv structure
+            Z0_train = Z0[1:(min(folds_ix[[r]]) - 1), ]
+            Z1_train = Z1[1:(min(folds_ix[[r]]) - 1), ]
+            Z0_test  = Z0[min(folds_ix[[r]]):max(folds_ix[[r]]), ]
+            Z1_test  = Z1[min(folds_ix[[r]]):max(folds_ix[[r]]), ]
+            alpha_grid = data.frame()
+            for (j in 1:na) {
+              a        = self$alphas[j]
+              fit      = glmnet(
+                x = Z0_train,
+                y = Z1_train,
+                family = 'gaussian',
+                alpha = a,
+                lambda = self$lambdas,
+                standardize = FALSE,
+                intercept = FALSE,
+                lower.limits = self$lower_limit_weights,
+                upper.limits = self$upper_limit_weights
+              )
+              
+              w = as.matrix(coef(fit, s = self$lambdas))[-1, ]
+              int_elast = as.matrix(apply(Z1_train - Z0_train %*% w, 2, mean))
+              y_pred  = int_elast[rep(1, nrow(Z0_test)), ]  + as.matrix(Z0_test) %*% w
+              y_true  = Z1_test
+              # Chose MAPE because it is unitless across multiple outcomes
+              mape_lambda = as.numeric(apply(y_pred, 2, function(y_pred)
+                Metrics::mape(y_true, y_pred)))
+              alpha_grid_tmp = data.frame(
+                fold = paste0('Fold', rep(r, length(self$lambdas))),
+                alpha = rep(a, length(self$lambdas)),
+                lambda = self$lambdas,
+                mape = mape_lambda
+              )
+              alpha_grid = rbind(alpha_grid, alpha_grid_tmp)
+            }
+            alpha_grid$measure = self$measure_vars[m]
+            alpha_grid$unit    = colnames(Z)[i]
+            cv_grid = rbind(cv_grid, alpha_grid)
+          }
+          names(cv_grid)[which(names(cv_grid) == self$measure_col)] = 'measure'
+          wide_cv_grid = dcast(cv_grid, lambda + alpha + measure + unit ~ fold, value.var = 'mape')
+          names(wide_cv_grid)[1:4] = c('lambda', 'alpha', 'measure', 'unit')
+          # results for all units across same measure
+          units_for_same_measure = rbind(units_for_same_measure, wide_cv_grid)
+        }
+        # results for all units across all measures
+        raw_results = bind_rows(units_for_same_measure, raw_results)
+      }
+      
+      summary_results = raw_results %>%
+        mutate(row_means = rowMeans(select(., starts_with('Fold')), na.rm = T)) %>%
+        group_by(lambda, alpha, unit) %>%
+        summarise(cv_score = mean(row_means, na.rm = T)) %>%
+        ungroup() %>%
+        group_by(unit) %>%
+        summarise(alpha = alpha[which.min(cv_score)],
+                  lambda = lambda[which.min(cv_score)],
+                  cv_score = min(cv_score)) %>%
+        ungroup()
+      
+      summary_results$lambda_ix = 0
+      for (u in 1:nrow(summary_results)) {
+        summary_results$lambda_ix[u] = which(self$lambdas == summary_results$lambda[u])
+      }
+      summary_results = summary_results %>%
+        arrange(factor(unit, levels = colnames(Y)))
+      return(summary_results)
+    },
+    cv_untreated = function() {
+      setDT(self$donor_units)
+      setDT(self$treated_units)
+      results = data.frame()
+      for (m in 1:length(self$measure_vars)) {
+        measure_results <- data.frame()
+        cat(
+          paste(
+            '\n\n\n\n\n\n\nCross Validating for measure:',
+            self$measure_vars[m],
+            '\n\n\n\n\n'
+          )
+        )
+        pre = self$pre_list[[m]]
+        post = self$post_list[[m]]
+        
+        donor_wide_measure = self$long_to_wide(self$donor_units[get(self$measure_col) == self$measure_vars[m], ],
+                                               self$time_col,
+                                               self$unit_col,
+                                               self$value_col)
+        # generate a list of the hold out periods based on Hyndman CV structure
+        folds_ix = self$generate_hyndman_folds(
+          start_cv = self$start_cv_list[m],
+          end_cv = self$end_cv_list[m],
+          cv_step = self$cv_step_list[m]
+        )
+        ####  data structure
+        Y = as.matrix(donor_wide_measure)
+        
+        # Number of units
+        if (self$placebo == T) {
+          N  = dim(Y)[2]
+        }
+        
+        else {
+          N = 1
+        }
+        # Total time periods
+        Time = length(c(pre,post))
+        # Pre period
+        T0   = length(pre)
+        # Post Period
+        T1   = length(post)
+        na  = length(self$alphas)
+        
+        
+        cat('\n\n\n\n******* Cross Validation *******\n\n\n\n')
+        fold_grid = data.frame()
+        for (r in 1:length(folds_ix)) {
+          cat(paste0('***************** fold ', r, '\n'))
+          cv_grid = data.frame()
+          for (i in 1:N) {
+            # unitName = sub('District ', '', colnames(Y)[i])
+            
+            
+            Z1       = as.matrix(Y[,i, drop = F])
+            Z0       = as.matrix(Y[,-i,drop = F])   
+            Z0_train = Z0[1:(min(folds_ix[[r]]) - 1),,drop=F] 
+            Z1_train = Z1[1:(min(folds_ix[[r]]) - 1),,drop=F]
+            Z0_test  = Z0[min(folds_ix[[r]]):max(folds_ix[[r]]),,drop=F]
+            Z1_test  = Z1[min(folds_ix[[r]]):max(folds_ix[[r]]),,drop=F]
+            
+            if (self$verbose == T) {
+              cat('*** Unit', colnames(Y[,i,drop = F]), '***\n\n')
+            }
+            
+            alpha_grid = data.frame()
+            # DI cv structure
+            for (j in 1:na) {
+              a        = self$alphas[j]
+              fit      = glmnet(x = Z0_train, 
+                                y = Z1_train,
+                                family = 'gaussian',
+                                alpha = a,
+                                lambda = self$lambdas,
+                                standardize = FALSE,
+                                intercept = FALSE,
+                                lower.limits = self$lower_limit_weights,
+                                upper.limits = self$upper_limit_weights)
+              y_pred  = predict(fit, newx = Z0_test, type = 'response', s = fit$lambda)
+              y_true  = Z1_test
+              mape_lambda = as.numeric(apply(y_pred, 2, function(y_pred)
+                Metrics::mape(y_true, y_pred)))
+              lambda_ix  = which(mape_lambda == min(mape_lambda))
+              alpha_grid_tmp = data.frame(unit = colnames(Z1_train), 
+                                          fold = rep(r, length(self$lambdas)), 
+                                          alpha = rep(a, length(self$lambdas)), 
+                                          lambda = self$lambdas, 
+                                          mape = mape_lambda,
+                                          measure = self$measure_vars[m])
+              alpha_grid = rbind(alpha_grid, alpha_grid_tmp)
+            }
+            cv_grid = rbind(cv_grid, alpha_grid)
+            rm(alpha_grid)
+          }
+          fold_grid = rbind(cv_grid, fold_grid)
+          rm(cv_grid)
+        }
+        fold_grid[fold_grid == Inf] = NA
+        fold_grid = fold_grid %>%
+          mutate(fold= paste0('fold_', fold)) %>%
+          group_by(alpha, lambda, measure, fold) %>%
+          summarise(mape = mean(mape, na.rm = T))
+        
+        final_grid = dcast(fold_grid, lambda + alpha ~ fold + measure, value.var = 'mape')
+        rm(fold_grid)
+        # results for all units across all measures
+        if (m==1) {
+          results = final_grid
+        } else {
+          results = results %>%
+            left_join(final_grid)
+          
+        }
+      }
+      
+      results = results %>%
+        mutate(rowmeans = rowMeans(results[,3:ncol(results)]))
+      min_row = which(results$rowmeans == min(results$rowmeans))
+      choice_alpha = results[min_row,'alpha']
+      choice_lambda = results[min_row, 'lambda']
+      choice_lambda_ix = which(self$lambdas == choice_lambda)[1]
+      cat(paste('choice alpha', choice_alpha, 'choice lambda', choice_lambda, 'choice lambda ix', choice_lambda_ix))
+      units = c(unique(as.character(self$treated_units[[self$unit_col]])), 
+                unique(as.character(self$donor_units[[self$unit_col]])))
+      cat(paste('units', units))
+      summary_results = expand.grid(unit = units, 
+                                    alpha = choice_alpha, 
+                                    lambda = choice_lambda,
+                                    lambda_ix = choice_lambda_ix,
+                                    mape = results[min_row, 'rowmeans'])
+      return(summary_results)
+    },
+    cv = function(type) {
+      private$type <- type
+      if (private$type == 'individual') {
+        results <- self$cv_treated()
+      } else if (private$type == 'grouped') {
+        results <- self$cv_untreated()
+      }
+      return(results)
+    },
+    generate_weights = function(cv_results) {
+      
+      ## Pre periods for stacked outcomes
+      treated_units_wide = self$long_to_wide_weights(dt = self$treated_units, 
+                                                self$pre_list, 
+                                                self$time_col, 
+                                                self$unit_col, 
+                                                self$measure_col, 
+                                                self$value_col, 
+                                                self$measure_vars)
+      
+      donor_units_wide = self$long_to_wide_weights(dt = self$donor_units, 
+                                              self$pre_list, 
+                                              self$time_col, 
+                                              self$unit_col, 
+                                              self$measure_col, 
+                                              self$value_col, 
+                                              self$measure_vars)
+      
+      ####  data structure
+      OutcomeMatrix = as.matrix(cbind(treated_units_wide, donor_units_wide))
+      # Time Periods for units minus treated
+      Y0 = as.matrix(OutcomeMatrix[,-self$treated])
+      # Time Periods for treated
+      Y1 = as.matrix(OutcomeMatrix[,self$treated, drop = F])
+      # Combined
+      Y  = as.matrix(cbind(Y1, Y0))
+      ##### Params
+      n_tr = dim(self$treated_units)[2]
+      # Number of units
+      private$cv_results <- cv_results
+      
+      private$cv_results = private$cv_results %>%
+        arrange(factor(unit, levels = colnames(Y)))
+      
+      
+      if (self$placebo) {
+        N = dim(Y)[2]
+      }
+      else {
+        N = 1
+      }
+      
+      w_final = list(list())
+
+      for (i in 1:N) {
+        
+        
+        Z1 = as.matrix(Y[,i, drop = F])
+        Z0 = as.matrix(Y[,-c(1:ncol(treated_units_wide), i),drop = F])
+        Z = cbind(Z1, Z0)
+        row_means = apply(Z, 1, mean)
+        row_max   = apply(Z, 1, max)
+        
+        # Still experimental --- if there are very different levels across outcomes, glmnet will over fit to the outcome with the highest levels
+        # ---------------------- as it is trying to minimize overall MSE. Therefore, if there are multiple outcomes, need some way to normalize data. 
+        # ---------------------- Here, I assigne observation weights of 1/row mean to normalize. Still up for debate what the best normailization approach is.
+        
+        if (length(self$measure_vars) == 1) {
+          obs.weights = rep(1, nrow(Z0))
+        }
+
+        else {
+          obs.weights = 1/row_means
+        }
+
+        
+        # 
+        # Fit elast
+        fit_final   = glmnet(x = Z0, 
+                             y = Z1,
+                             family = 'gaussian',
+                             alpha = private$cv_results$alpha[i],
+                             lambda = self$lambdas,
+                             standardize = FALSE,
+                             intercept = FALSE,
+                             lower.limits = self$lower_limit_weights,
+                             upper.limits = self$upper_limit_weights,
+                             weights = obs.weights)
+        
+        w_final[[i]] = as.matrix(coef(fit_final, s = self$lambdas))[-1,private$cv_results$lambda_ix[i]]
         
       }
-    }
-    
-    err_alpha_lambda_opt = err_alpha_lambda %>% 
-      group_by(unit) %>%
-      summarise(a = a[which.min(error)], lambda = opt_lambda[which.min(error)], error = min(error), sd = sd[which.min(error)])
-    
-  }
-  else {
-    err_alpha_lambda    = expand.grid(a = a_grid, opt_lambda = 0, error = 0, sd = 0, unit = colnames(Y)[1])
-    for (j in 1:na) {
-      a        = a_grid[j]
-      Y1       = as.matrix(Y[,1, drop = F])
-      unitName = gsub('_[0-9]+', '', colnames(Y1))
-      Y0       = as.matrix(Y[,-c(1)])
-      Z1       = as.matrix(Z[,i, drop = F])
-      Z0       = as.matrix(Z[,-c(1)])
-      V1      = scale(Z1, scale = FALSE)
-      V0      = scale(Z0, scale = FALSE)
-      fit     = cv.glmnet(x = V0, y = V1,
-                          alpha = a,
-                          standardize = FALSE,
-                          intercept = FALSE,
-                          lower.limits = lower_limit_weights,
-                          upper.limits = upper_limit_weights,
-                          pmax = max_number_units,
-                          nfolds = nfolds)
-      err_alpha_lambda$error[j]      = fit$cvm[fit$lambda == fit$lambda.min]
-      err_alpha_lambda$sd[j]         = fit$cvsd[fit$lambda == fit$lambda.min]
-      err_alpha_lambda$opt_lambda[j] = fit$lambda[fit$lambda == fit$lambda.min]
       
-    }
-    
-    err_alpha_lambda_opt_new = err_alpha_lambda %>% 
-      group_by(unit) %>%
-      summarise(a = a[which.min(error)], lambda = opt_lambda[which.min(error)], sd = sd[which.min(error)], error = min(error))
-    
-    err_alpha_lambda_opt_new$error_post = rep(0, 1)
-    
-    err_alpha_lambda_opt = err_alpha_lambda_opt[-1,]
-    err_alpha_lambda_opt = rbind(err_alpha_lambda_opt_new, err_alpha_lambda_opt)
-  }
-  ###### Cross validation for many lambda over given alpha
-  
-  err_alpha_lambda_opt$error_post = rep(0, N)
-  int_elast   = matrix(0, nrow = 1, ncol = 1)
-  Y_elast     = matrix(0, nrow = Time, ncol = 1)
-  Y_true      = matrix(0, nrow = Time, ncol = 1)
-  old_frame   = data.frame()
-  for (i in 1:N) {
-    if (i != 1) {
-      old_frame = new_frame
-    }
-    Y1 = as.matrix(Y[,i,drop = F])
-    unitName = gsub('_[0-9]+', '', colnames(Y1))
-    Y0 = as.matrix(Y[,-c(i, grep(paste(unitName, '_', sep = ''), colnames(Y)))])
-    Z1 = as.matrix(Z[,i, drop = F])
-    Z0 = as.matrix(Z[,-c(i, grep(paste(unitName, '_', sep = ''), colnames(Y)))])
-    V1 = rbind(scale(Z1, scale = FALSE))
-    V0 = rbind(scale(Z0, scale = FALSE))
-    
-    # Fit elast
-    fit_final   = glmnet(x = V0, y = V1,
-                         alpha = err_alpha_lambda_opt$a[i],
-                         lambda = err_alpha_lambda_opt$lambda[i],
-                         standardize = FALSE,
-                         intercept = FALSE,
-                         pmax = max_number_units,
-                         lower.limits = lower_limit_weights,
-                         upper.limits = upper_limit_weights)
-    w           = as.matrix(coef(fit_final, s = err_alpha_lambda_opt$lambda[i]))[-1,]
-    if (i == 1) {
+      if (self$placebo == T) {
+        names(w_final) = private$cv_results$unit
+      }
+      else {
+        names(w_final) = private$cv_results$unit[1]
+      }
+      w_final
+    },
+    fit = function(weights, cv_results) {
 
-      w_final     = w
-      int_elast   = as.matrix(apply(Z1 - Z0 %*% w_final, 2, mean))
-      Y_elast     = int_elast[rep(1, Time),] + Y0 %*% w_final
-      Y_elast_final = Y_elast
-      Y_true      = Y1[c(1:max(pre),post)]
-      Y_true_final = Y_true
-      gaps          = Y_true[c(1:max(pre),post)] - Y_elast[c(1:max(pre),post)]
-      Y_smape       = Metrics::smape(Y_elast[1:max(pre)], Y_true[1:max(pre)])
+      setDT(self$treated_units)
+      setDT(self$donor_units)
+      private$cv_results = cv_results
+      private$cv_results$fitted_error_pre = 0
+      private$cv_results$fitted_mape_pre  = 0
+      private$cv_results$error_post = 0
+      private$cv_results$mape_post = 0
+      private$weights = weights
+      result_cv_frame = data.frame()
+      result_series_frame = data.frame()
       
+      for (j in 1:length(self$measure_vars)) {
+        
+        
+        start_month = as.Date(self$start_month_list[j])
+        end_month = as.Date(self$end_month_list[j])
+        month_seq  = seq(start_month, end_month, by = self$time_unit_list[j])
+        month_join = data.frame(time = min(self$pre_list[[j]]):max(self$post_list[[j]]), month = month_seq)
+        treated_units_wide = self$long_to_wide(self$treated_units[get(self$measure_col) == self$measure_vars[j],], 
+                                          self$time_col, 
+                                          self$unit_col, 
+                                          self$value_col)
+        donor_units_wide = self$long_to_wide(self$donor_units[get(self$measure_col) == self$measure_vars[j],], 
+                                        self$time_col, 
+                                        self$unit_col, 
+                                        self$value_col)
+        
+        OutcomeMatrix = as.matrix(cbind(treated_units_wide, donor_units_wide))
+        Y0 = as.matrix(OutcomeMatrix[,-self$treated])
+        Y1 = as.matrix(OutcomeMatrix[,self$treated, drop = F])
+        Y  = as.matrix(cbind(Y1, Y0))
+        
+        private$cv_results = private$cv_results %>%
+          arrange(factor(unit, levels = colnames(Y)))
+        
+        ##### Params
+        n_tr = dim(self$treated_units)[2]
+        # Number of units
+        
+        # Pre period
+        T0   = length(self$pre_list[[j]])
+        # Post Period
+        T1   = length(self$post_list[[j]])
+        
+        if (self$placebo) {
+          N = dim(OutcomeMatrix)[2]
+        }
+        else {
+          N = 1
+        }
+        
+        series_frame = data.frame()
+        
+        for (i in 1:N) {
+          Y0_res = as.matrix(Y[,-c(1:ncol(treated_units_wide), i)])
+          # Time Periods for treated
+          Y1_res = as.matrix(Y[,i, drop = F])
+          Y = cbind(Y1, Y0)
+          Z0 = Y0_res[pre_list[[j]],,drop=F]
+          Z1 = Y1_res[pre_list[[j]],,drop=F]
+          
+          int_elast        = as.matrix(apply(Z1 - as.matrix(Z0[self$pre_list[[j]],]) %*% as.matrix(private$weights[[i]]), 2, mean))
+          Y_elast          = int_elast[rep(1, max(self$post_list[[j]])),] + as.matrix(Y0_res) %*% private$weights[[i]]
+          Y_true           = Y1_res
+          gaps             = Y_true - Y_elast
+          private$cv_results$fitted_error_pre[i] = Metrics::mse(Y_true[self$pre_list[[j]]], Y_elast[self$pre_list[[j]]])
+          private$cv_results$fitted_mape_pre[i]  = Metrics::mape(Y_true[self$pre_list[[j]]], Y_elast[self$pre_list[[j]]])
+          private$cv_results$error_post[i] = Metrics::mse(Y_true[self$post_list[[j]]], Y_elast[self$post_list[[j]]])
+          private$cv_results$mape_post[i] = Metrics::mape(Y_true[self$post_list[[j]]], Y_elast[self$post_list[[j]]])
+          
+
+          series_frame   = rbind(series_frame, 
+                                 data.frame(gaps = unname(unlist(gaps)), 
+                                            y_true = Y_true[c(min(self$pre_list[[j]]):max(self$pre_list[[j]]),self$post_list[[j]])],
+                                            y_elast = Y_elast[c(min(self$pre_list[[j]]):max(self$pre_list[[j]]),self$post_list[[j]])],
+                                            time = c(min(self$pre_list[[j]]):max(self$pre_list[[j]]),self$post_list[[j]]), 
+                                            unit_type = ifelse(i %in% 1:ncol(treated_units_wide), 'Treated Unit', 'Control Unit Distribution'), 
+                                            unit = colnames(Y)[i]))
+          
+        }
+        
+        series_frame     = merge(series_frame, month_join, by = 'time', all.x = TRUE)
+        private$cv_results$placebo_test_p_value = 1 - rank(private$cv_results$error_post)/nrow(private$cv_results)
+        private$cv_results$adh_test_p_value = 1 - rank(private$cv_results$mape_post/private$cv_results$fitted_mape_pre)/nrow(private$cv_results)
+        private$cv_results$series = self$measure_vars[j]
+        series_frame$series = self$measure_vars[j]
+        
+        result_cv_frame = rbind(result_cv_frame, private$cv_results)
+        result_series_frame = rbind(result_series_frame, series_frame)
+        
+      }
       
-      plotFrame   = data.frame(time = c(pre,post), Y_true = Y_true, Y_elast = Y_elast, gaps = gaps)
-      plotFrame   = merge(plotFrame, month_join, by = 'time', all.x = TRUE)
-      min_post_month = plotFrame$month[plotFrame$time == min(post)]
-      max_post_month = plotFrame$month[plotFrame$time == max(post)]
-      # 
-      path.plot   = ggplot(plotFrame) +
-        geom_line(aes(x = as.Date(month), y = Y_true), colour = 'black', size = 2) +
-        geom_line(aes(x = as.Date(month), y = Y_elast), colour = 'indianred3', linetype = 'longdash', size = 2) +
-        geom_rect(aes(xmin = min_post_month, xmax = max_post_month, ymin = -Inf, ymax = Inf), color="olivedrab2",
-                  alpha=0.01,
-                  inherit.aes = FALSE) +
-        theme(panel.background = element_rect(fill = "white"),
-              panel.grid.major = element_line(colour = "white"),
-              panel.grid.minor = element_line(colour = "white"),
-              axis.line.x = element_line(colour = 'black'),
-              axis.line.y = element_line(colour = 'black')) +
-        xlab('Time Period') +
-        ylab('Outcome') +  
-        xlim(c(as.Date(start_month), as.Date(end_month %m+% months(2))))
+      return(list(stats = result_cv_frame,
+                  series_frame = result_series_frame))
       
+    },
+    plot = function(series_frame) {
+      private$series_frame <- series_frame
+      treated_unit_names <- sort(unique(subset(private$series_frame, unit_type == 'Treated Unit')$unit))
+      path_plots <- list()
+      placebo_plots <- list()
+      for (i in 1:length(treated_unit_names)) {
+        path_plot = ggplot(subset(private$series_frame, unit == treated_unit_names[i])) +
+          geom_line(aes(x = as.Date(month), y = y_true), colour = 'black', size = 2) +
+          geom_line(aes(x = as.Date(month), y = y_elast), colour = 'indianred3', linetype = 'F1', size = 2, alpha = 0.7) +
+          geom_vline(xintercept = as.numeric(as.Date(max_pre_month)), linetype = 'dotted', size = 1.4, alpha = 0.8) +
+          theme(panel.background = element_rect(fill = "white"),
+                panel.grid.major = element_line(colour = "white"),
+                panel.grid.minor = element_line(colour = "white"),
+                axis.line.x = element_line(colour = 'black'),
+                axis.line.y = element_line(colour = 'black'),
+                text = element_text(size = 10)) +
+          xlab('Time Period') +
+          ylab('Outcome') +  
+          xlim(c(as.Date(start_month), as.Date(end_month) + 60)) +
+          ggtitle(paste('Actual (Black) vs Synthetic for', treated_unit_names[i], sep = ' ')) +
+          facet_wrap(~series, scales = 'free_y', nrow = 3)
+        
+        path_plots[[i]] <- path_plot
+        
+        placebo_plot = ggplot(private$series_frame) +
+          geom_line(data = subset(private$series_frame, unit_type == 'Control Unit Distribution'), aes(x = month, y = gaps, group = unit),colour = 'grey', size = 0.5, alpha = 0.55) +
+          geom_line(data = subset(private$series_frame, unit == treated_unit_names[i]), aes(x = month, y = gaps), size = 2, colour = 'black') +
+          geom_hline(aes(yintercept = 0)) +  facet_wrap(~series, scales = 'free_y', nrow = 3) +
+          theme(panel.background = element_rect(fill = "white"),
+                panel.grid.major = element_line(colour = "white"),
+                panel.grid.minor = element_line(colour = "white"), 
+                axis.line.x = element_line(colour = 'black'),
+                axis.line.y = element_line(colour = 'black'),
+                text = element_text(size = 10)) +
+          geom_vline(xintercept = as.numeric(as.Date(self$max_pre_month)), linetype = 'dotted', size = 1.4, alpha = 0.8)
+        placebo_plots[[i]] <- placebo_plot
+      }
       
-      
+      names(path_plots) = treated_unit_names
+      names(placebo_plots) = treated_unit_names
+      return(list(path_plots = path_plots, placebo_plots = placebo_plots))
+    },
+    generate_hyndman_folds = function(start_cv, end_cv, cv_step) {
+      number_folds <-  end_cv - (start_cv - 1) - (cv_step - 1)
+      folds_ix <- list()
+      for (i in 1:number_folds) {
+        folds_ix[[i]] <- (start_cv + (i - 1)):(start_cv + (i - 1) + (cv_step - 1))
+      }
+      folds_ix
+    },
+    long_to_wide = function(dt, time_col, unit_col, value_col) {
+      dt_wide = dcast(dt, get(time_col) ~ get(unit_col), value.var = value_col)
+      dt_wide[,1] = NULL
+      dt_wide[is.na(dt_wide)] = 0
+      dt_wide[dt_wide == Inf] = 0
+      dt_wide
+    },
+    long_to_wide_weights = function(dt, pre_list, time_col, unit_col, measure_col, value_col, fitted_vars) {
+      library(data.table)
+      setDT(dt)
+      subset_frame = data.frame()
+      for (i in 1:length(fitted_vars)) {
+        tmp = data.frame(measure = fitted_vars[i], pre = pre_list[[i]])
+        subset_frame = rbind(tmp, subset_frame)
+      }
+      dt = merge(dt, subset_frame, by.x = c(measure_col, time_col),by.y = c('measure', 'pre'), all.y = T) 
+      dt_wide = dcast(dt, get(time_col) + get(measure_col) ~ get(unit_col), value.var = value_col) %>% setDT()
+      names(dt_wide)[1:2] = c(time_col, measure_col)
+      dt_wide[,eval(measure_col) := factor(get(measure_col), levels = fitted_vars)]
+      dt_wide = dt_wide %>% arrange(get(measure_col), get(time_col))
+      dt_wide[,1:2] = NULL
+      dt_wide[is.na(dt_wide)] = 0
+      dt_wide[dt_wide == Inf] = 0
+      dt_wide
     }
+  )
+)
     
-    int_elast   = as.matrix(apply(Z1 - Z0 %*% w, 2, mean))
-    Y_elast     = int_elast[rep(1, Time),] + Y0 %*% w
-    Y_true      = Y1
-    err_alpha_lambda_opt$error_post[i] = Metrics::mse(Y_true[post], Y_elast[post])
-    gaps        = Y_true[c(1:max(pre),post)] - Y_elast[c(1:max(pre),post)]
-    new_frame   = data.frame(gaps = unlist(gaps),
-                             y_true = Y_true[c(1:max(pre),post)], 
-                             y_elast = Y_elast[c(1:max(pre),post)],
-                             time = c(1:max(pre),post), 
-                             unit_type = ifelse(i == 1, 'Treated Unit', 'Control Unit Distribution'), 
-                             unit = colnames(Y)[i])
-    new_frame   = rbind(old_frame, new_frame)
-    
-  }
-  new_frame     = merge(new_frame, month_join, by = 'time', all.x = TRUE)
-  percent_frame = subset(new_frame, time %in% post) %>%
-    mutate(p_stat_lower = rank(gaps)/length(gaps),
-           p_stat_above = 1 - (rank(gaps)/length(gaps)),
-           p_stat_two_tail = ifelse(rank(gaps)/length(gaps) > 0.5, 1 - (rank(gaps)/length(gaps)), rank(gaps)/length(gaps)))
+ 
+ 
+generate_public_crime_data <- function() {
+  library(dplyr)
+  library(RSocrata)
+  library(zoo)
+  library(lubridate)
+  library(tidyr)
   
-  if (test == 'lower') {
-    p_stat = subset(percent_frame, unit_type == 'Treated Unit')$p_stat_lower
-  }
-  else if (test == 'upper') {
-    p_stat = subset(percent_frame, unit_type == 'Treated Unit')$p_stat_above
-  }
-  else if (test == 'two-tail') {
-    p_stat = subset(percent_frame, unit_type == 'Treated Unit')$p_stat_two_tail
-  }
+  fbi_code <- "'05'" # 01A = Murder, 02 = CSA, 03 = Robbery, 04A = Assault, 04B = Battery
+  # Pull all data with FBI Code less than 05
+  url <- sprintf("https://data.cityofchicago.org/resource/6zsd-86xi.json?$select=*&$where=fbi_code<%s", fbi_code)
+  violent_felonies <- read.socrata(url)
+  violent_felonies$date_clean <- as.Date(as.POSIXct(violent_felonies$date, format = '%Y-%m-%d %H:%M:%S'))
+  violent_felonies$yearmon <- as.Date(as.yearmon(violent_felonies$date_clean))
   
+  violent_felonies_by_district <- violent_felonies %>%
+    group_by(yearmon, district, .drop=F) %>%
+    summarise(countcrimes = length(id)) %>%
+    complete(yearmon, district) %>%
+    ungroup() %>%
+    mutate(fbi_code = 'VF') %>%
+    bind_rows(
+      violent_felonies %>%
+        # define homicide as homicide + second degree homicide
+        mutate(fbi_code = ifelse(fbi_code == '01B', '01A', fbi_code)) %>%
+        group_by(yearmon, district, fbi_code, .drop =F) %>%
+        summarise(countcrimes = length(id)) %>%
+        complete(yearmon, district, fbi_code)
+    ) %>%
+    filter(yearmon >= '2010-03-01' & yearmon <= '2018-12-01') %>%
+    # --- period is six month intervals, Period 1 = March through August, Period 2 = September through February. 
+    # --- Except for 2017 due to staggered release of SDSCs and introduction of Tier 2 SDSCs before the end of period 2
+    mutate(period = ifelse(month(yearmon) %in% 3:8, 1, 2),
+           period = ifelse(month(yearmon) %in% 1:2, 
+                           as.numeric(paste(year(yearmon) - 1, period, sep = '.')),
+                           as.numeric(paste(year(yearmon), period, sep = '.'))),
+           period = ifelse(month(yearmon) %in% 1:2 & year(yearmon) == 2018, period + 0.9, period),
+           period = ifelse(month(yearmon) == 2 & year(yearmon) == 2017, period + 0.9, period),
+           period = as.numeric(as.character(period)),
+           period = as.factor(period),
+           district = as.factor(district),
+           fbi_code = as.factor(fbi_code)) %>%
+    group_by(period, district, fbi_code, .drop=F) %>%
+    summarise(countcrimes = mean(countcrimes)) %>%
+    ungroup() %>%
+    # --- generate time variable
+    arrange(district, fbi_code, period) %>%
+    group_by(district, fbi_code) %>%
+    mutate(countcrimes = ifelse(is.nan(countcrimes), 0, countcrimes),
+           time = 1:length(period))
   
-  min_post_month = unique(new_frame$month[new_frame$time == min(post)])
-  max_post_month = unique(new_frame$month[new_frame$time == max(post)])
-  far_x_axis_month = max_post_month %m+% months(2)
-  near_x_axis_month = max_post_month %m-% months(3*10)
-  
-  
-  placebo = ggplot() +
-    geom_line(data = subset(new_frame, unit_type == 'Control Unit Distribution'), aes(x = month, y = gaps, group = unit),colour = 'grey', size = 0.5, alpha = 0.4) +
-    geom_line(data = subset(new_frame, unit_type == 'Treated Unit'), aes(x = month, y = gaps), size = 2, colour = 'black') +
-    geom_hline(aes(yintercept = 0)) +
-    theme(panel.background = element_rect(fill = "white"),
-          panel.grid.major = element_line(colour = "white"),
-          panel.grid.minor = element_line(colour = "white"), 
-          axis.line.x = element_line(colour = 'black'),
-          axis.line.y = element_line(colour = 'black')) +
-    geom_rect(aes(xmin = min_post_month, xmax = max_post_month, ymin = -Inf, ymax = Inf), color="black",
-              alpha=0.01,
-              inherit.aes = FALSE) +
-    ggtitle('Gaps Between Actual Unit and Synthetic Unit,\nwith Results from Placebo Test in Post Period') + 
-    xlim(c(as.Date(near_x_axis_month), as.Date(far_x_axis_month)))
-  
-  
-  
-  # treated unit
-  
-  
-  return(list(w = w_final, 
-              Y_true = Y_true_final, 
-              Y_elast = Y_elast_final, 
-              fit = fit_final, 
-              #    lambda_opt = lambda_opt, 
-              #    alpha_opt = a_opt,
-              placebo_frame = new_frame,
-              placebo = placebo,
-              path.plot = path.plot,
-              smape = Y_smape,
-              dev.ratio = dev.ratio,
-              err_alpha_lambda_opt = err_alpha_lambda_opt,
-              p_stat = p_stat))
-  
-  
+  treated_units <- subset(violent_felonies_by_district, district %in% c('006', '007', '009', '010', '011', '015'))
+  donor_units <- subset(violent_felonies_by_district, !(district %in%  c('006', '007', '009', '010', '011', '015', '031')))
+  return(list(treated_units = treated_units,
+              donor_units = donor_units))
 }
+
+ 
