@@ -1,4 +1,3 @@
-source('~/ElasticSynth_git/R/ElasticSynth_oo.R')
 ### Generate Crime Data
 crime_data <- generate_public_crime_data()
 treated_units <- crime_data$treated_units
