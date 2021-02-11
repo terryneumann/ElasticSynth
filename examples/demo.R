@@ -2,8 +2,8 @@
 crime_data <- generate_public_crime_data()
 treated_units <- crime_data$treated_units
 donor_units <- crime_data$donor_units
-treated_units <- read.csv('~/treated_units.csv')
-donor_units <- read.csv('~/donor_units.csv')
+#treated_units <- read.csv('~/treated_units.csv')
+#donor_units <- read.csv('~/donor_units.csv')
 head(treated_units, n = 30)
 head(donor_units, n = 30)
 
