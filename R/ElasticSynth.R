@@ -1,11 +1,24 @@
 #' @importFrom R6 R6Class
-#' @export
 
 #' ElasticSynth - a class for running synthetic controls with elastic net regularization
 #'
 #'
 #' Model is initiated with a list of parameters most which include treated_units and donor_units, two dataframes that 
-#' contain time periods, units, and counts of 
+#' contain time periods, units, and counts of outcomes
+#' 
+#' @param treated_units Treated units data.frame
+#' @param donor_units Donor units data.frame
+#' @param measure_vars Outcome measures upon which to jointly fit a synthetic control
+#' @param measure_col Column name for measure_vars
+#' @param unit_col Column name for unit information
+#' @param time_col Column name for time information (in form 1:max(time))
+#' @param pre_list A list of lists or vectors representing pre periods across all outcomes
+#' @param post_list A list of lists or vectors representing post periods across all outcomes
+#' @param start_cv_list A list indicating where to start CV procedure in time
+#' @param end_cv_list A list indicating where to end CV procedure in time
+#' @param time_unit_list A list indicating the time between time periods
+#' @param alphas vector of alphas to use for cross validation - for more information see glment
+#' @export
 
 
 
