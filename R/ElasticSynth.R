@@ -222,7 +222,7 @@ ElasticSynth <- R6::R6Class(
         }
         
         if (self$placebo == F) {
-          N = dim(Y1)[2]
+          N = ncol(treated_wide_measure)
         }
         
         ## Month frame for plotting
@@ -338,13 +338,10 @@ ElasticSynth <- R6::R6Class(
         Y = as.matrix(donor_wide_measure)
         
         # Number of units
-        if (self$placebo == T) {
-          N  = dim(Y)[2]
-        }
+        N  = dim(Y)[2]
         
-        else {
-          N = 1
-        }
+        
+        
         # Total time periods
         Time = length(c(pre,post))
         # Pre period
