@@ -1,4 +1,3 @@
-#' @importFrom R6 R6Class
 
 #' ElasticSynth - a class for running synthetic controls with elastic net regularization
 #'
@@ -18,6 +17,7 @@
 #' @param end_cv_list A list indicating where to end CV procedure in time
 #' @param time_unit_list A list indicating the time between time periods
 #' @param alphas vector of alphas to use for cross validation - for more information see glment
+#' @importFrom R6 R6Class
 #' @export
 
 
