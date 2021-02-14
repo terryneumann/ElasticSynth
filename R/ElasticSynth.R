@@ -487,7 +487,7 @@ ElasticSynth <- R6::R6Class(
         N = dim(Y)[2]
       }
       else {
-        N = 1
+        N = ncol(treated_units_wide)
       }
       
       w_final = list(list())
@@ -535,7 +535,7 @@ ElasticSynth <- R6::R6Class(
         names(w_final) = private$cv_results$unit
       }
       else {
-        names(w_final) = private$cv_results$unit[1]
+        names(w_final) = private$cv_results$unit[1:ncol(treated_units_wide)]
       }
       w_final
     },
@@ -589,7 +589,7 @@ ElasticSynth <- R6::R6Class(
           N = dim(OutcomeMatrix)[2]
         }
         else {
-          N = 1
+          N = ncol(treated_units_wide)
         }
         
         series_frame = data.frame()
