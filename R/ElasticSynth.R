@@ -212,7 +212,7 @@ ElasticSynth <- R6::R6Class(
         }
         
         if (self$placebo == F) {
-          N = 1
+          N = dim(Y0)[2]
         }
         
         ## Month frame for plotting
