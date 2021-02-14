@@ -290,7 +290,7 @@ ElasticSynth <- R6::R6Class(
       }
       
       summary_results = raw_results %>%
-        mutate(row_means = rowMeans(select(., starts_with('Fold')), na.rm = T)) %>%
+        mutate(row_means = rowMeans(dplyr::select(., starts_with('Fold')), na.rm = T)) %>%
         group_by(lambda, alpha, unit) %>%
         summarise(cv_score = mean(row_means, na.rm = T)) %>%
         ungroup() %>%
