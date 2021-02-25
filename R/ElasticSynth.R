@@ -84,7 +84,6 @@ ElasticSynth <- R6::R6Class(
       suppressMessages(library(glmnet))
       suppressMessages(library(lubridate))
       suppressMessages(library(dplyr))
-      suppressMessages(library(tidyr))
       suppressMessages(library(Metrics))
       suppressMessages(library(reshape2))
       suppressMessages(library(data.table))
@@ -449,7 +448,6 @@ ElasticSynth <- R6::R6Class(
       return(results)
     },
     generate_weights = function(cv_results) {
-      
       ## Pre periods for stacked outcomes
       treated_units_wide = self$long_to_wide_weights(dt = self$treated_units, 
                                                 self$pre_list, 
@@ -704,7 +702,7 @@ ElasticSynth <- R6::R6Class(
         subset_frame = rbind(tmp, subset_frame)
       }
       dt = merge(dt, subset_frame, by.x = c(measure_col, time_col),by.y = c('measure', 'pre'), all.y = T) 
-      dt_wide = reshape2::dcast(dt, get(time_col) + get(measure_col) ~ get(unit_col), value.var = value_col)
+      dt_wide = dcast(dt, get(time_col) + get(measure_col) ~ get(unit_col), value.var = value_col)
       names(dt_wide)[1:2] = c(time_col, measure_col)
       dt_wide <- data.table(dt_wide)
       dt_wide[,eval(measure_col) := factor(get(measure_col), levels = fitted_vars)]
