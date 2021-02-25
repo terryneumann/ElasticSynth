@@ -697,21 +697,22 @@ ElasticSynth <- R6::R6Class(
     },
     long_to_wide_weights = function(dt, pre_list, time_col, unit_col, measure_col, value_col, fitted_vars) {
       library(data.table)
-      setDT(dt)
+      dt <- data.table(dt)
       subset_frame = data.frame()
       for (i in 1:length(fitted_vars)) {
         tmp = data.frame(measure = fitted_vars[i], pre = pre_list[[i]])
         subset_frame = rbind(tmp, subset_frame)
       }
       dt = merge(dt, subset_frame, by.x = c(measure_col, time_col),by.y = c('measure', 'pre'), all.y = T) 
-      dt_wide = reshape2::dcast(dt, get(time_col) + get(measure_col) ~ get(unit_col), value.var = value_col) %>% setDT()
+      dt_wide = reshape2::dcast(dt, get(time_col) + get(measure_col) ~ get(unit_col), value.var = value_col)
       names(dt_wide)[1:2] = c(time_col, measure_col)
+      dt_wide <- data.table(dt_wide)
       dt_wide[,eval(measure_col) := factor(get(measure_col), levels = fitted_vars)]
       dt_wide = dt_wide %>% arrange(get(measure_col), get(time_col))
       dt_wide[,1:2] = NULL
       dt_wide[is.na(dt_wide)] = 0
       dt_wide[dt_wide == Inf] = 0
-      dt_wide
+      return(dt_wide)
     }
   )
 )
