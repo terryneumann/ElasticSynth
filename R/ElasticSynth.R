@@ -186,11 +186,11 @@ ElasticSynth <- R6::R6Class(
         pre = self$pre_list[[m]]
         post = self$post_list[[m]]
         
-        treated_wide_measure = self$long_to_wide(self$treated_units[get(as.name(self$measure_col)) == self$measure_vars[m], ],
+        treated_wide_measure = self$long_to_wide(self$treated_units[get(self$measure_col) == self$measure_vars[m], ],
                                             self$time_col,
                                             self$unit_col,
                                             self$value_col)
-        donor_wide_measure = self$long_to_wide(self$donor_units[get(as.name(self$measure_col)) == self$measure_vars[m], ],
+        donor_wide_measure = self$long_to_wide(self$donor_units[get(self$measure_col) == self$measure_vars[m], ],
                                           self$time_col,
                                           self$unit_col,
                                           self$value_col)
@@ -280,7 +280,7 @@ ElasticSynth <- R6::R6Class(
             cv_grid = rbind(cv_grid, alpha_grid)
           }
           names(cv_grid)[which(names(cv_grid) == self$measure_col)] = 'measure'
-          wide_cv_grid = dcast(cv_grid, lambda + alpha + measure + unit ~ fold, value.var = 'mape')
+          wide_cv_grid = reshape2::dcast(cv_grid, lambda + alpha + measure + unit ~ fold, value.var = 'mape')
           names(wide_cv_grid)[1:4] = c('lambda', 'alpha', 'measure', 'unit')
           # results for all units across same measure
           units_for_same_measure = rbind(units_for_same_measure, wide_cv_grid)
@@ -409,7 +409,7 @@ ElasticSynth <- R6::R6Class(
           group_by(alpha, lambda, measure, fold) %>%
           summarise(mape = mean(mape, na.rm = T))
         
-        final_grid = dcast(fold_grid, lambda + alpha ~ fold + measure, value.var = 'mape')
+        final_grid = reshape2::dcast(fold_grid, lambda + alpha ~ fold + measure, value.var = 'mape')
         rm(fold_grid)
         # results for all units across all measures
         if (m==1) {
@@ -688,7 +688,7 @@ ElasticSynth <- R6::R6Class(
       folds_ix
     },
     long_to_wide = function(dt, time_col, unit_col, value_col) {
-      dt_wide = dcast(dt, get(time_col) ~ get(unit_col), value.var = value_col)
+      dt_wide = reshape2::dcast(dt, get(time_col) ~ get(unit_col), value.var = value_col)
       dt_wide[,1] = NULL
       dt_wide[is.na(dt_wide)] = 0
       dt_wide[dt_wide == Inf] = 0
@@ -703,7 +703,7 @@ ElasticSynth <- R6::R6Class(
         subset_frame = rbind(tmp, subset_frame)
       }
       dt = merge(dt, subset_frame, by.x = c(measure_col, time_col),by.y = c('measure', 'pre'), all.y = T) 
-      dt_wide = dcast(dt, get(time_col) + get(measure_col) ~ get(unit_col), value.var = value_col) %>% setDT()
+      dt_wide = reshape2::dcast(dt, get(time_col) + get(measure_col) ~ get(unit_col), value.var = value_col) %>% setDT()
       names(dt_wide)[1:2] = c(time_col, measure_col)
       dt_wide[,eval(measure_col) := factor(get(measure_col), levels = fitted_vars)]
       dt_wide = dt_wide %>% arrange(get(measure_col), get(time_col))
