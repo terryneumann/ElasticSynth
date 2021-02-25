@@ -82,7 +82,6 @@ ElasticSynth <- R6::R6Class(
     {
       ### load packages
       suppressMessages(library(glmnet))
-      suppressMessages(library(ggplot2))
       suppressMessages(library(lubridate))
       suppressMessages(library(dplyr))
       suppressMessages(library(tidyr))
@@ -188,11 +187,11 @@ ElasticSynth <- R6::R6Class(
         
         
         
-        treated_wide_measure = self$long_to_wide(treated_units[get(self$measure_col) == self$measure_vars[m], ],
+        treated_wide_measure = self$long_to_wide(treated_units[mget(self$measure_col) == self$measure_vars[m], ],
                                             self$time_col,
                                             self$unit_col,
                                             self$value_col)
-        donor_wide_measure = self$long_to_wide(donor_units[get(self$measure_col) == self$measure_vars[m], ],
+        donor_wide_measure = self$long_to_wide(donor_units[mget(self$measure_col) == self$measure_vars[m], ],
                                           self$time_col,
                                           self$unit_col,
                                           self$value_col)
