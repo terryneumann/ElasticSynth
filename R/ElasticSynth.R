@@ -171,8 +171,8 @@ ElasticSynth <- R6::R6Class(
     
     cv_treated = function() {
       
-      setDT(self$treated_units)
-      setDT(self$donor_units)
+      treated_units <- data.frame(self$treated_units)
+      donor_units <- data.frame(self$donor_units)
       raw_results = data.frame()
       for (m in 1:length(self$measure_vars)) {
         cat(
@@ -187,11 +187,11 @@ ElasticSynth <- R6::R6Class(
         
         
         
-        treated_wide_measure = self$long_to_wide(self$treated_units[eval(parse(text = paste0(self$measure_col, "=='", self$measure_vars[m],"'"))), ],
+        treated_wide_measure = self$long_to_wide(treated_units[treated_units[,self$measure_col]==self$measure_vars[m],],
                                             self$time_col,
                                             self$unit_col,
                                             self$value_col)
-        donor_wide_measure = self$long_to_wide(self$donor_units[eval(parse(text = paste0(self$measure_col, "=='", self$measure_vars[m],"'"))), ],
+        donor_wide_measure = self$long_to_wide(donor_units[donor_units[,self$measure_col]==self$measure_vars[m],],
                                           self$time_col,
                                           self$unit_col,
                                           self$value_col)
