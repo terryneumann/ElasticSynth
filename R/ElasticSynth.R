@@ -146,8 +146,8 @@ ElasticSynth <- R6::R6Class(
       self$treated <- 1
       self$alphas <- alphas
       self$lambdas <- lambdas
-      self$treated_units <- treated_units
-      self$donor_units <- donor_units
+      self$treated_units <- setDT(treated_units)
+      self$donor_units <- setDT(donor_units)
       self$measure_vars <- measure_vars
       self$measure_col <- measure_col
       self$unit_col <- unit_col
@@ -186,11 +186,11 @@ ElasticSynth <- R6::R6Class(
         pre = self$pre_list[[m]]
         post = self$post_list[[m]]
         
-        treated_wide_measure = self$long_to_wide(self$treated_units[get(eval(self$measure_col)) == self$measure_vars[m], ],
+        treated_wide_measure = self$long_to_wide(self$treated_units[get(self$measure_col) == self$measure_vars[m], ],
                                             self$time_col,
                                             self$unit_col,
                                             self$value_col)
-        donor_wide_measure = self$long_to_wide(self$donor_units[get(eval(self$measure_col)) == self$measure_vars[m], ],
+        donor_wide_measure = self$long_to_wide(self$donor_units[get(self$measure_col) == self$measure_vars[m], ],
                                           self$time_col,
                                           self$unit_col,
                                           self$value_col)
@@ -559,11 +559,11 @@ ElasticSynth <- R6::R6Class(
         end_month = as.Date(self$end_month_list[j])
         month_seq  = seq(start_month, end_month, by = self$time_unit_list[j])
         month_join = data.frame(time = min(self$pre_list[[j]]):max(self$post_list[[j]]), month = month_seq)
-        treated_units_wide = self$long_to_wide(self$treated_units[get(eval(self$measure_col)) == self$measure_vars[j],], 
+        treated_units_wide = self$long_to_wide(self$treated_units[get(self$measure_col) == self$measure_vars[j],], 
                                           self$time_col, 
                                           self$unit_col, 
                                           self$value_col)
-        donor_units_wide = self$long_to_wide(self$donor_units[get(eval(self$measure_col)) == self$measure_vars[j],], 
+        donor_units_wide = self$long_to_wide(self$donor_units[get(self$measure_col) == self$measure_vars[j],], 
                                         self$time_col, 
                                         self$unit_col, 
                                         self$value_col)
