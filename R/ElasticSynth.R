@@ -187,11 +187,11 @@ ElasticSynth <- R6::R6Class(
         
         
         
-        treated_wide_measure = self$long_to_wide(treated_units[mget(self$measure_col) == self$measure_vars[m], ],
+        treated_wide_measure = self$long_to_wide(treated_units[eval(parse(text = paste(self$measure_col, self$measure_vars[m], sep = '=='))), ],
                                             self$time_col,
                                             self$unit_col,
                                             self$value_col)
-        donor_wide_measure = self$long_to_wide(donor_units[mget(self$measure_col) == self$measure_vars[m], ],
+        donor_wide_measure = self$long_to_wide(donor_units[eval(parse(text = paste(self$measure_col, self$measure_vars[m], sep = '=='))), ],
                                           self$time_col,
                                           self$unit_col,
                                           self$value_col)
