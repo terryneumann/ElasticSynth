@@ -702,10 +702,9 @@ ElasticSynth <- R6::R6Class(
       }
       dt = merge(dt, subset_frame, by.x = c(measure_col, time_col),by.y = c('measure', 'pre'), all.y = T) 
       dt_wide = dcast(dt, get(time_col) + get(measure_col) ~ get(unit_col), value.var = value_col)
-      names(dt_wide)[1:2] = c(time_col, measure_col)
       dt_wide <- data.table(dt_wide)
-      dt_wide[,eval(measure_col) := factor(get(measure_col), levels = fitted_vars)]
-      dt_wide = dt_wide %>% arrange(get(measure_col), get(time_col))
+      dt_wide[,measure_col := factor(measure_col, levels = fitted_vars)]
+      dt_wide = dt_wide %>% arrange(measure_col, time_col)
       dt_wide[,1:2] = NULL
       dt_wide[is.na(dt_wide)] = 0
       dt_wide[dt_wide == Inf] = 0
