@@ -450,21 +450,20 @@ ElasticSynth <- R6::R6Class(
     generate_weights = function(cv_results) {
       ## Pre periods for stacked outcomes
       treated_units_wide = self$long_to_wide_weights(dt = self$treated_units, 
-                                                self$pre_list, 
-                                                self$time_col, 
-                                                self$unit_col, 
-                                                self$measure_col, 
-                                                self$value_col, 
-                                                self$measure_vars)
+                                                pre_list = self$pre_list, 
+                                                time_col = self$time_col, 
+                                                unit_col = self$unit_col, 
+                                                measure_col = self$measure_col, 
+                                                value_col = self$value_col, 
+                                                fitted_vars = self$measure_vars)
       
       donor_units_wide = self$long_to_wide_weights(dt = self$donor_units, 
-                                              self$pre_list, 
-                                              self$time_col, 
-                                              self$unit_col, 
-                                              self$measure_col, 
-                                              self$value_col, 
-                                              self$measure_vars)
-      
+                                                   pre_list = self$pre_list, 
+                                                   time_col = self$time_col, 
+                                                   unit_col = self$unit_col, 
+                                                   measure_col = self$measure_col, 
+                                                   value_col = self$value_col, 
+                                                   fitted_vars = self$measure_vars)      
       ####  data structure
       OutcomeMatrix = as.matrix(cbind(treated_units_wide, donor_units_wide))
       # Time Periods for units minus treated
