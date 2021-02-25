@@ -3,3 +3,4 @@
 export(ElasticSynth)
 export(generate_public_crime_data)
 importFrom(R6,R6Class)
+import(data.table)
