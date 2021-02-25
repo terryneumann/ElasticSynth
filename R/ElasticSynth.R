@@ -324,7 +324,7 @@ ElasticSynth <- R6::R6Class(
         pre = self$pre_list[[m]]
         post = self$post_list[[m]]
         
-        donor_wide_measure = self$long_to_wide(self$donor_units[get(self$measure_col) == self$measure_vars[m], ],
+        donor_wide_measure = self$long_to_wide(self$donor_units[get(as.name(self$measure_col)) == self$measure_vars[m], ],
                                                self$time_col,
                                                self$unit_col,
                                                self$value_col)
