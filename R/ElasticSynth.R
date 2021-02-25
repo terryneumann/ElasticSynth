@@ -186,11 +186,14 @@ ElasticSynth <- R6::R6Class(
         pre = self$pre_list[[m]]
         post = self$post_list[[m]]
         
-        treated_wide_measure = self$long_to_wide(self$treated_units[base::get(self$measure_col) == self$measure_vars[m], ],
+        treated_df <- data.frame(treated_units)
+        donor_df <- data.frame(donor_units)
+        
+        treated_wide_measure = self$long_to_wide(treated_df[treated_df[,self$measure_col] == self$measure_vars[m], ],
                                             self$time_col,
                                             self$unit_col,
                                             self$value_col)
-        donor_wide_measure = self$long_to_wide(self$donor_units[base::get(self$measure_col) == self$measure_vars[m], ],
+        donor_wide_measure = self$long_to_wide(donor_df[treated_df[,self$measure_col] == self$measure_vars[m], ],
                                           self$time_col,
                                           self$unit_col,
                                           self$value_col)
