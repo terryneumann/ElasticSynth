@@ -325,7 +325,7 @@ ElasticSynth <- R6::R6Class(
         post = self$post_list[[m]]
         
         donor_wide_measure = self$long_to_wide(self$donor_units[base::get(self$measure_col) == self$measure_vars[m], ],
-                                               self$time_col,outcome_join_finalget
+                                               self$time_col,
                                                self$unit_col,
                                                self$value_col)
         # generate a list of the hold out periods based on Hyndman CV structure
